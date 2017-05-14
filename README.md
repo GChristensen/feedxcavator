@@ -31,14 +31,14 @@ Only the following CSS capabilities are currently supported by __feedxcavator__:
 </pre>
 
 __feedxcavator__ uses [enlive](https://github.com/cgrand/enlive#readme)
-library for HTML processing and internally converts all the CSS selectors into
+library for HTML processing and internally converts all CSS selectors into
 [enlive selectors](http://enlive.cgrand.net/syntax.html).
 The conversion routine is quite straightforward, so it's 
 better to use enlive selectors in complex cases if css selectors do not work. 
 __feedxcavator__ will assume that elnive selectors are used if the selector 
 string is wrapped in square brackets (e.g. [:div#some-id :> :h1.some-class 
 :> :a]) and will not try to convert them.
-Although, regular CSS selector should successfully deal with relatively simple hierarchical 
+Although, regular CSS selectors should successfully deal with relatively simple hierarchical 
 queries, which should be enough in the majority of cases.
 
 
