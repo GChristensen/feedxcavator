@@ -7,7 +7,7 @@ Feedxcavator allows program feed extraction in a simple Clojure-based
 the web UI (see the [demo](https://gchristensen.github.io/feedxcavator/demo/console.html)). 
 This allows to perform arbitrary
 transformations on the extracted content, such as sorting or filtering.
-It also hosts a built-in [WebSub](https://en.wikipedia.org/wiki/WebSub) hub to push
+There is also a built-in [WebSub](https://en.wikipedia.org/wiki/WebSub) hub to push
 real-time feed updates to RSS readers.
 
 ## Semi-automatic feed extraction
@@ -117,11 +117,11 @@ representation if it resembles a readable Clojure datum
 
 ## Custom feed extractors
 
-Feedxcavator will use the supplied CSS selectors to automatically extract data if the
+Feedxcavator will use the provided CSS selectors to automatically extract data if the
 "extractor" field of the YAML config is not specified. Otherwise, it assumes
 that this field contains the name of an extractor function that should be invoked
 to provide the feed content. Extractor functions should be coded in Clojure programming
-language at the __Feedxavator__ "Extractors" tab.
+language at the Feedxcavator "Extractors" tab.
 
 Extractors are defined with the `defextractor` macro.
 Extractor functions accept the feed definition as a Clojure map and should return a collection of
@@ -154,7 +154,8 @@ The `api/fetch-url` function allows obtaining contents of any web resource. It t
 exceptions and returns `nil` if a network or HTTP error has occurred. To find out what is happening 
 use the `api/get-last-http-error` function to get the last HTTP response code 
 and `api/get-last-http-response` to get the whole last [ring](https://github.com/ring-clojure) response.
-Its `:as` keyword argument allows to convert the response to the corresponding format,
+When debugging, it may be more convenient to wrap it into the `log-fetch-errors` macro.
+The `:as` keyword argument of `api/fetch-url` allows to convert the response to the corresponding format,
 defined by the argument value:
   * `:html` - parsed enlive HTML representation
   * `:xml` - parsed enlive XML representation
@@ -165,11 +166,36 @@ defined by the argument value:
 A raw ring response is returned when the argument is omitted. Please see the Feedxcavator 
 "API" tab for more info.
 
+## Selecting elements
+
+The usual workflow is to fetch a web resource as an Enlive document (with the `:as :html` arguments
+passed to `api/fetch-url`)
+and use the [Enlive](https://github.com/cgrand/enlive) library to retrieve the required parts of it.
+Because the Clojure code that does it may look noisy and verbose, Feedxcavator provides some 
+handy shortcuts: 
+
+```clojure
+(?* node-or-nodes selector) ;; select multiple nodes from an enlive HTML node
+                            ;; the equivalent of (enlive/select node-or-nodes selector)
+(?1 node-or-nodes selector) ;; select the first node that matches the selector
+                            ;; the equivalent of (first (enlive/select node-or-nodes selector))
+(?1a node-or-nodes selector) ;; return the map of attributes of the first node that matches the selector
+                             ;; the equivalent of (:attrs (first (enlive/select node-or-nodes selector))))
+(?1c node-or-nodes selector) ;; return contained nodes from the first node that matches the selector
+                             ;; the equivalent of (:content (first (enlive/select node-or-nodes selector))))
+(<t node-or-nodes) ;; return text content (without tags) of the given enlive nodes
+                   ;; the equivalent of (str/trim (enlive/text node-or-nodes) 
+(<* node-or-nodes) ;; return the outer HTML of the given enlive nodes
+                   ;; the equivalent of (apply str (enlive/emit* nodeset))
+
+```
+
+
 ## Extracting feeds in the background
 
 Feeds that do not have the `task` attribute in their YAML definition are
 extracted each time when the Feedxcavator feed URL is visited. Feeds that have
-this attribute are extracted in the background, their produced feed content is
+this attribute are extracted in the background, and their produced feed content is
 stored in the database. It is then served when the user or feed reader visits the feed URL.
 This approach is suitable for the feeds that require complex and time-consuming
 processing. To trigger extraction of the background feed it is necessary to
@@ -203,7 +229,7 @@ individual tasks. The subtasks may be executed in parallel. The tasks specified 
 ```
 
 
-It is possible to run a task at any time through the task context menu:
+It is possible to run a task at any time through the task context menu at the task list:
 
 ![run task](https://raw.githubusercontent.com/GChristensen/feedxcavator/main/media/tasks-context-menu.png)
 

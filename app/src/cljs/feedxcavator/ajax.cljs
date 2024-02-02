@@ -34,8 +34,10 @@
                 (if (str/includes? line "  ")
                   (str/join "  " (-> line (str/split #"  ") reverse))
                   line)
-                )]
-    (str/join "\n" lines)))
+                )
+        lines (str/join "\n" lines)
+        lines (str/join "\n\n\n" (reverse (str/split lines #"\n\n\n")) )]
+    lines))
 
 (defn extract-server-error [response-text]
   (let [error (-> response-text
