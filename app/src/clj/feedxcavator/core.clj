@@ -23,7 +23,7 @@
 
 (def ^:const app-version "3.0.0")
 
-(def ^:const deployment-type :demo) ;; :private, :demo
+(def ^:const deployment-type :private) ;; :private, :demo
 
 (def ^:const user-code-ns "feedxcavator.code-user")
 
