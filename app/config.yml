@@ -1,0 +1,10 @@
+hostname: 'http://localhost:10000'
+websub-hostname: 'http://localhost:10000'
+authentication: false
+websub: true
+user: user
+# bcrypt password hash, see https://cljdoc.org/d/buddy/buddy-hashers/1.4.0/doc/buddy-hashers-password-hashers-for-clojure
+password-hash: 'bcrypt+sha512$...'
+database-connection-url: 'jdbc:h2:./data/feedxcavator;MODE=MYSQL'
+exclusive-jdbc-connection: true
+auto-backup-database: false
