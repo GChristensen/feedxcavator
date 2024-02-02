@@ -129,6 +129,8 @@
         item-entry (fn [key item]
                      (core/html-sanitize (key item)))
         date (fmt/unparse (:rfc822 fmt/formatters) (tm/now))
+        now (tm/now)
+        item-ctr (atom 1)
         rss (hiccup/html
               [:rss (array-map :version "2.0"
                                :xmlns:atom "http://www.w3.org/2005/Atom"
@@ -148,7 +150,8 @@
                   [:item
                    [:title (item-entry :title headline)]
                    [:link (item-entry :link headline)]
-                   ;[:pubDate (fmt/unparse (fmt/formatters :rfc822) (tm/now))]
+                   [:pubDate (fmt/unparse (fmt/formatters :rfc822)
+                                          (tm/plus now (tm/seconds (swap! item-ctr inc))))]
                    (if (:guid headline)
                      [:guid {:isPermaLink "false"} (item-entry :guid headline)]
                      (when (:realtime feed)

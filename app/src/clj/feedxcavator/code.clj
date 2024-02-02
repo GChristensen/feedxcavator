@@ -191,12 +191,17 @@
   (let [settings (db/fetch :settings "main")
         start-time (core/timestamp)
         jobs (doall (for [task-name task-names]
-                      (fetch-feeds-in-background task-name (task-feeds task-name))))
+                      (let [task-feeds (task-feeds task-name)]
+                        (when (seq task-feeds)
+                          (fetch-feeds-in-background task-name task-feeds)))))
+        jobs (filter #(not (nil? %)) jobs)
         ]
     (future
       (let [_ (doall (map #(identity @%) jobs))]
         (when on-completion
-          (let [on-completion (if (seq? on-completion) on-completion [on-completion])]
+          (let [on-completion (if (or (string? on-completion) (symbol? on-completion))
+                                [on-completion]
+                                on-completion)]
             (doseq [task-name on-completion]
               (enqueue-task (name task-name)))))
         (when (:enable-profiling settings)
