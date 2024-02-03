@@ -387,6 +387,13 @@ and open http://localhost:10000 in the browser.
 
 Please use a HTTPS enabled gateway when deploying in open internet.
 
+## Building
+
+The application is built with [lein ring](https://github.com/weavejester/lein-ring). 
+Issue `lein ring server` in the project directory to run a debug server.
+The command `lein ring uberjar` will create an executable JAR file with all 
+necessary dependencies.
+
 ## Using with NewsBlur
 
 Feedxcavator could be seamlessly used with [NewsBlurMod](https://github.com/GChristensen/NewsBlurMod).

@@ -1,5 +1,6 @@
 (ns feedxcavator.code-user
-  (:require [clojure.string :as str]
+  (:require [clojure.core.async :as async]
+            [clojure.string :as str]
             [clojure.data.json :as json]
             [clojure.tools.macro :as macro]
             [clj-time.core :as time]

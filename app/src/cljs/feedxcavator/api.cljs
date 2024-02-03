@@ -11,6 +11,7 @@
 
 Namespaces:
 
+  clojure.core.async :as async         ;; e.g. (async/chan)
   clojure.string :as str               ;; e.g. (str/includes? s \"my string\")
   clojure.data.json :as json           ;; e.g. (json/read-str s :key-fn keyword)
   clj-time.core :as time               ;; e.g. (time/date-time 1986 10 14)
@@ -22,6 +23,8 @@ Namespaces:
   feedxcavator.webdriver :as webdriver ;; e.g. (webdriver/config :firefox {...})
   feedxcavator.log :as log             ;; e.g. (log/write :error \"Error message\")
   feedxcavator.db :as db               ;; e.g. (db/store-object! \"object-uuid\" {:field \"value\"})
+
+  Any other available namespace could be referred by its full name, e.g. (clojure.java.io/reader x).
 
 Macros:
 
