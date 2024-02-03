@@ -277,7 +277,8 @@ following log levels may be specified as the first argument:
 It is possible to apply word filters to the `title` and `summary` fields of the generated headlines
 to omit certain content from the resulting feeds.
 The name of the used word filter may be specified in the "wordfilter" field of the YAML config.
-The word filter with the name "default" is used otherwise. 
+The word filter with the name "default" is used when filtering is enabled without the specified
+filter. 
 
 Word filters can contain ordinary strings and regular expressions (it is often useful to
 place a word boundary \b to avoid excessive matching). Currently, there is no GUI to manage word-filter contents -
