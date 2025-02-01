@@ -358,12 +358,12 @@ source: https://example.com
         old-images (db/query :image (< :timestamp days-ago))
         old-log-entries (db/query :log-entry (< :timestamp days-ago))]
     (doseq [image old-images]
-      (db/delete-image! (:uuid image)))
+      (try
+        (db/delete-image! (:uuid image))
+        (catch Exception e (log/write (str "error deleting image: " (:uuid image))))))
     (db/delete! :log-message (map :uuid old-log-entries))
     (db/delete! :log-entry (map :uuid old-log-entries)))
   (reply/web-page "text/plain" "OK"))
-
-(chime-at (core/daily-at 4 0) service-task-background)
 
 (defn import-word-filter [word-filter]
   (let [words (map #(if (str/starts-with? % "(?i)") (re-pattern %) %)
