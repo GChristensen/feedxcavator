@@ -1,0 +1,340 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Feedxcavator — dig feeds out of anything</title>
+<meta name="description" content="Feedxcavator is an experimental workshop that turns RSS feeds and plain web pages into new feeds (RSS, JSON Feed, EDN) and lets you rewrite their contents with your own code.">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0d0e10">
+<link rel="icon" type="image/png" href="img/logo.png">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&amp;family=Barlow+Condensed:wght@600;700&amp;family=Roboto:wght@400;500;700&amp;family=Roboto+Mono:wght@400;500&amp;display=swap">
+<link rel="stylesheet" href="styles.css">
+<script src="main.js" defer></script>
+</head>
+<body>
+
+<!-- icon sprite -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <symbol id="i-folder" viewBox="0 0 16 16"><path d="M1.5 3.5h4.2l1.4 1.5h7.4v7.5a1 1 0 0 1-1 1H2.5a1 1 0 0 1-1-1z" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linejoin="round"/></symbol>
+  <symbol id="i-feed" viewBox="0 0 16 16"><circle cx="3.6" cy="12.4" r="1.4" fill="currentColor"/><path d="M2.5 7.2a6.3 6.3 0 0 1 6.3 6.3M2.5 3a10.5 10.5 0 0 1 10.5 10.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></symbol>
+  <symbol id="i-right" viewBox="0 0 10 10"><path d="M3 1.5 6.8 5 3 8.5" fill="none" stroke="currentColor" stroke-width="1.2"/></symbol>
+  <symbol id="i-down" viewBox="0 0 10 10"><path d="M1.5 3 5 6.8 8.5 3" fill="none" stroke="currentColor" stroke-width="1.2"/></symbol>
+</svg>
+
+<!-- NAV -->
+<header class="site-header">
+  <a class="brand" href="#top" aria-label="Feedxcavator home">
+    <img src="img/logo.png" width="28" height="29" alt="">
+    <span class="brand__name">Feedxcavator</span>
+  </a>
+  <nav class="site-nav">
+    <a href="#what">what</a>
+    <a href="#how">how</a>
+    <a href="#code">code</a>
+    <a href="#sources">sources</a>
+    <a href="#formats">formats</a>
+    <a class="site-nav__gh" href="https://github.com/GChristensen/feedxcavator">GitHub</a>
+  </nav>
+</header>
+
+<main>
+
+<!-- HERO -->
+<section class="hero" id="top">
+  <p class="hero__tag"><span class="dot"></span>experimental &middot; open source &middot; GPL v3</p>
+  <h1 class="hero__title">Dig the feed<br>out of <em>anything.</em></h1>
+  <div class="hero__row">
+    <p class="hero__lede">Feedxcavator reads RSS feeds and ordinary web pages, lets you reshape what it finds
+      with a few lines of your own code, and serves the result as a fresh feed for your reader.</p>
+    <div class="hero__actions">
+      <a class="btn btn--lg" href="https://gchristensen.github.io/feedxcavator/demo/console.html">Try the live demo</a>
+      <a class="btn btn--lg btn--ghost" href="https://github.com/GChristensen/feedxcavator">Source on GitHub</a>
+    </div>
+  </div>
+
+  <!-- UI mockup: decorative, so hidden from assistive tech behind one description -->
+  <figure class="hero__figure">
+    <div class="win" role="img" aria-label="The Feedxcavator console: a list of feeds on the left, a YAML feed definition in the editor and the generated RSS output below it.">
+      <div class="win__bar" aria-hidden="true">
+        <i></i><i></i><i></i>
+        <span class="win__url">localhost:10000</span>
+      </div>
+
+      <div class="app" aria-hidden="true">
+        <div class="app__head">
+          <img src="img/logo.png" width="56" height="58" alt="">
+          <span class="app__name">Feedxcavator</span>
+        </div>
+        <div class="app__tabs">
+          <span class="is-on">Feeds</span><span>Tasks</span><span>Library</span><span>Extractors</span><span>Handlers</span><span>Scratch</span><span>Log</span><span>Settings</span><span>API</span>
+        </div>
+
+        <div class="app__main">
+          <!-- feed list -->
+          <div class="pane pane--tree">
+            <div class="bar bar--left"><span>New Feed</span></div>
+            <ul class="tree">
+              <li class="row"><svg class="chev"><use href="#i-right"/></svg><svg class="ico"><use href="#i-folder"/></svg>blogs</li>
+              <li class="row"><svg class="chev"><use href="#i-down"/></svg><svg class="ico"><use href="#i-folder"/></svg>news</li>
+              <li class="row row--2 is-sel"><svg class="ico ico--feed"><use href="#i-feed"/></svg>Orbital Dispatch</li>
+              <li class="row row--2"><svg class="ico ico--feed"><use href="#i-feed"/></svg>Harbor Weekly</li>
+              <li class="row row--2"><svg class="ico ico--feed"><use href="#i-feed"/></svg>City Council Minutes</li>
+              <li class="row row--2"><svg class="ico ico--feed"><use href="#i-feed"/></svg>Storm Watch</li>
+              <li class="row"><svg class="chev"><use href="#i-down"/></svg><svg class="ico"><use href="#i-folder"/></svg>shops</li>
+              <li class="row row--2"><svg class="ico ico--feed"><use href="#i-feed"/></svg>Vintage Synth Listings</li>
+              <li class="row row--2"><svg class="ico ico--feed"><use href="#i-feed"/></svg>Second-hand Bikes</li>
+              <li class="row"><svg class="chev"><use href="#i-right"/></svg><svg class="ico"><use href="#i-folder"/></svg>forums</li>
+              <li class="row"><svg class="chev"><use href="#i-right"/></svg><svg class="ico"><use href="#i-folder"/></svg>video</li>
+            </ul>
+          </div>
+
+          <!-- editor + output -->
+          <div class="pane pane--work">
+            <div class="bar bar--tools"><span>Save</span><span>Test</span><span>Open</span><span>Subscribe</span><span>Delete</span></div>
+            <pre class="code code--yaml"><i class="l"><b class="k">title:</b> 'Orbital Dispatch'</i><i class="l"><b class="k">suffix:</b> orbital-dispatch</i><i class="l"><b class="k">source:</b> https://example.org/launches</i><i class="l"><b class="k">group:</b> news</i><i class="l"><b class="k">task:</b> news</i><i class="l"><b class="k">filter:</b></i><i class="l">  <b class="k">history:</b> <b class="n">true</b></i><i class="l">  <b class="k">content:</b> title+summary</i><i class="l">  <b class="k">wordfilter:</b> default</i><i class="l"><b class="k">realtime:</b> <b class="n">true</b></i><i class="l"><b class="k">partition:</b> <b class="n">50</b></i><i class="l"><b class="k">extractor:</b> launch-extractor</i><i class="l"><b class="k">params:</b> {<b class="k">featured:</b> <b class="n">true</b>}</i></pre>
+            <div class="out-label">Output:</div>
+            <pre class="code code--xml"><i class="l"><b class="t">&lt;?xml</b> <b class="a">version</b>=<b class="q">"1.0"</b> <b class="a">encoding</b>=<b class="q">"UTF-8"</b><b class="t">?&gt;</b></i><i class="l"><b class="t">&lt;rss</b> <b class="a">version</b>=<b class="q">"2.0"</b><b class="t">&gt;</b></i><i class="l">  <b class="t">&lt;channel&gt;</b></i><i class="l">    <b class="t">&lt;title&gt;</b>Orbital Dispatch<b class="t">&lt;/title&gt;</b></i><i class="l">    <b class="t">&lt;link&gt;</b>https://example.org/launches<b class="t">&lt;/link&gt;</b></i><i class="l">    <b class="t">&lt;link</b> <b class="a">href</b>=<b class="q">"http://localhost:10000/websub"</b> <b class="a">rel</b>=<b class="q">"hub"</b><b class="t">/&gt;</b></i><i class="l">    <b class="t">&lt;link</b> <b class="a">href</b>=<b class="q">"http://localhost:10000/feed/orbital-dispatch"</b> <b class="a">rel</b>=<b class="q">"self"</b> <b class="a">type</b>=<b class="q">"application/rss+xml"</b><b class="t">/&gt;</b></i><i class="l">    <b class="t">&lt;item&gt;</b></i><i class="l">      <b class="t">&lt;title&gt;</b>Second stage lands on a barge, in the dark<b class="t">&lt;/title&gt;</b></i><i class="l">      <b class="t">&lt;link&gt;</b>https://example.org/launches/2026-09-second-stage-barge.html<b class="t">&lt;/link&gt;</b></i><i class="l">      <b class="t">&lt;guid</b> <b class="a">isPermaLink</b>=<b class="q">"false"</b><b class="t">&gt;</b>https://example.org/launches/2026-09-second-stage-barge.html<b class="t">&lt;/guid&gt;</b></i><i class="l">      <b class="t">&lt;category&gt;</b>Launch &amp;amp; Recovery<b class="t">&lt;/category&gt;</b></i><i class="l">      <b class="t">&lt;description&gt;</b>A first attempt at landing an upper stage on a moving platform ended with a soft splashdown<b class="t">&lt;/description&gt;</b></i></pre>
+          </div>
+        </div>
+      </div>
+    </div>
+  </figure>
+</section>
+
+<!-- WHAT IT IS -->
+<section class="section section--alt" id="what">
+  <div class="split">
+    <p class="eyebrow split__aside"><span class="eyebrow__num">01</span>what-it-is</p>
+    <div class="split__main">
+      <p class="statement">A feed is only as useful as what you can do to it.
+        <span>Feedxcavator sits between a source and your reader, and whatever passes through is yours to change.</span></p>
+    </div>
+  </div>
+
+  <div class="trio">
+    <article class="card">
+      <span class="card__step">in</span>
+      <h3>Take almost anything</h3>
+      <p>An existing RSS feed, or the plain HTML of a site that never offered one. Point at the headlines and it slices the page into items.</p>
+    </article>
+    <article class="card">
+      <span class="card__step">through</span>
+      <h3>Change it however you like</h3>
+      <p>Sort, filter, merge, rewrite, translate. There are no checkboxes to hit a wall against: the transformation is a small program you write.</p>
+    </article>
+    <article class="card">
+      <span class="card__step">out</span>
+      <h3>Serve it in any shape</h3>
+      <p>RSS, JSON Feed, plain JSON or EDN, with live push to readers that support it, so new items arrive the moment they exist.</p>
+    </article>
+  </div>
+</section>
+
+<!-- HOW IT WORKS -->
+<section class="section" id="how">
+  <div class="split split--wide">
+    <div class="editor">
+      <div class="editor__tab"><span>my-first-feed</span> <em>feed definition &middot; yaml</em></div>
+      <pre class="snippet"><code><span class="k">title:</span> Daily Digest
+<span class="k">suffix:</span> daily-digest
+<span class="k">source:</span> https://example.com/news
+<span class="k">selectors:</span>
+  <span class="k">item:</span>  article
+  <span class="k">title:</span> h2
+  <span class="k">link:</span>  h2 a
+  <span class="k">image:</span> img::src-lazy||src
+<span class="c"># extractor: my-extractor   (only if selectors are not enough)</span></code></pre>
+      <div class="editor__result">
+        <span class="mono-label">served at</span>
+        <ul><li><span>http://localhost:10000/feed/daily-digest</span></li></ul>
+      </div>
+    </div>
+
+    <div>
+      <div class="section-head">
+        <p class="eyebrow"><span class="eyebrow__num">02</span>how-it-works</p>
+        <h2 class="section-title">You describe. It does the rest.</h2>
+      </div>
+      <div class="roles">
+        <div class="role">
+          <p class="role__who">You write</p>
+          <ol>
+            <li><b>A feed definition</b> in plain YAML: where the page is, and ordinary CSS selectors that point at the headlines, links and pictures.</li>
+            <li><b>An extractor</b>, a small function, but only when selectors alone can&rsquo;t do the job.</li>
+          </ol>
+        </div>
+        <div class="role role--app">
+          <p class="role__who">Feedxcavator takes the rest</p>
+          <ol>
+            <li><b>Fetching</b> the pages, on request or on a schedule.</li>
+            <li><b>Serving</b> the finished feed at a stable URL.</li>
+            <li><b>Pushing</b> new items to readers the moment they appear (WebSub).</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CODE -->
+<section class="section section--alt" id="code">
+  <div class="split split--wide">
+    <div>
+      <div class="section-head">
+        <p class="eyebrow"><span class="eyebrow__num">03</span>your-rules</p>
+        <h2 class="section-title">The last mile is a program.</h2>
+        <p class="lede">Selectors get you most of the way. For everything else you write an extractor:
+          a short function that receives a feed definition and returns whatever headlines you want it to.</p>
+      </div>
+      <ul class="ticks">
+        <li>Written in the browser, in the same console that manages your feeds.</li>
+        <li>Fetch other pages, follow links, combine several sources into one feed.</li>
+        <li>Test a change on the spot and see the resulting feed right underneath.</li>
+      </ul>
+    </div>
+
+    <div class="editor">
+      <div class="editor__tab"><span>price-drops</span> <em>extractor</em></div>
+      <pre class="snippet"><code><span class="c">;; one headline per listing: "name — price"</span>
+(<span class="f">defextractor</span> <span class="s">price-drops</span> [feed]
+  (<span class="f">let</span> [page (api/fetch-url (:source feed) <span class="n">:as</span> <span class="n">:html</span>)]
+    (<span class="f">for</span> [card (?* page [<span class="n">:div.listing</span>])]
+      {<span class="n">:title</span> (str (&lt;t (?1 card [<span class="n">:h3</span>]))
+                   <span class="q">" — "</span>
+                   (&lt;t (?1 card [<span class="n">:.price</span>])))
+       <span class="n">:link</span>  (<span class="n">:href</span> (?1a card [<span class="n">:a</span>]))})))</code></pre>
+      <div class="editor__result">
+        <span class="mono-label">produces</span>
+        <ul>
+          <li><span>Juno-60, fully serviced — $1,450</span></li>
+          <li><span>Minimoog reissue — $2,900</span></li>
+          <li><span>Drum machine lot — $180</span></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- SOURCES -->
+<section class="section" id="sources">
+  <div class="split split--wide split--flip">
+    <figure class="diagram">
+      <svg viewBox="0 0 480 340" role="img" aria-labelledby="dia-t dia-d">
+        <title id="dia-t">How data flows through Feedxcavator</title>
+        <desc id="dia-d">RSS feeds, web pages and JSON APIs flow into Feedxcavator, where your code runs, and come out as RSS, JSON Feed or EDN. Below, an external script or browser add-on exchanges data with Feedxcavator in both directions.</desc>
+        <defs>
+          <marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M1 1 9 5 1 9z" class="dia-head"/></marker>
+        </defs>
+
+        <g class="dia-chip">
+          <rect x="1" y="21" width="118" height="42" rx="6"/><rect x="1" y="81" width="118" height="42" rx="6"/><rect x="1" y="141" width="118" height="42" rx="6"/>
+          <rect x="361" y="21" width="118" height="42" rx="6"/><rect x="361" y="81" width="118" height="42" rx="6"/><rect x="361" y="141" width="118" height="42" rx="6"/>
+        </g>
+        <g class="dia-line" marker-end="url(#ah)">
+          <path d="M119 42C150 42 150 90 174 100"/><path d="M119 102H172"/><path d="M119 162C150 162 150 112 174 104"/>
+          <path d="M306 100C332 90 332 42 358 42"/><path d="M308 102H358"/><path d="M306 104C332 112 332 162 358 162"/>
+        </g>
+        <g class="dia-text">
+          <text x="60" y="47" text-anchor="middle">RSS / Atom</text><text x="60" y="107" text-anchor="middle">Web page</text><text x="60" y="167" text-anchor="middle">JSON API</text>
+          <text x="420" y="47" text-anchor="middle">RSS</text><text x="420" y="107" text-anchor="middle">JSON Feed</text><text x="420" y="167" text-anchor="middle">EDN</text>
+        </g>
+
+        <rect class="dia-core" x="176" y="21" width="130" height="162" rx="8"/>
+        <text class="dia-core__name" x="241" y="93" text-anchor="middle">Feedxcavator</text>
+        <text class="dia-core__sub" x="241" y="115" text-anchor="middle">your code runs here</text>
+
+        <path class="dia-line dia-line--acc" d="M241 183V254" marker-start="url(#ah)" marker-end="url(#ah)"/>
+        <text class="dia-note" x="255" y="222">pages in, feeds out</text>
+        <rect class="dia-helper" x="121" y="256" width="240" height="70" rx="8"/>
+        <text class="dia-helper__name" x="241" y="286" text-anchor="middle">External script</text>
+        <text class="dia-helper__name" x="241" y="309" text-anchor="middle">or browser add-on</text>
+      </svg>
+    </figure>
+
+    <div>
+      <div class="section-head">
+        <p class="eyebrow"><span class="eyebrow__num">04</span>unusual-sources</p>
+        <h2 class="section-title">When a site won&rsquo;t play along.</h2>
+        <p class="lede">Some pages hide behind scripts, logins or clever layouts. So the digging does not have to
+          happen inside Feedxcavator at all.</p>
+      </div>
+      <dl class="defs">
+        <div>
+          <dt>External scripts</dt>
+          <dd>Feedxcavator can expose small web endpoints. A script in any language, running anywhere, can pick up a feed, do the awkward part, and post the finished result back.</dd>
+        </div>
+        <div>
+          <dt>Browser add-ons</dt>
+          <dd>Let an add-on do the visiting and copying inside a real browser session, then hand what it found to Feedxcavator to shape and publish.</dd>
+        </div>
+        <div>
+          <dt>Background tasks</dt>
+          <dd>Slow extractions run on a schedule instead of on demand. The finished feed is stored and served instantly whenever a reader asks.</dd>
+        </div>
+      </dl>
+    </div>
+  </div>
+</section>
+
+<!-- FORMATS -->
+<section class="section section--alt" id="formats">
+  <div class="section-head">
+    <p class="eyebrow"><span class="eyebrow__num">05</span>formats</p>
+    <h2 class="section-title">One item, several shapes.</h2>
+    <p class="lede">Pick the output that suits the reader &mdash; or the next program in your chain. Plain JSON is there too, for when a feed is only an intermediate step.</p>
+  </div>
+
+  <div class="formats">
+    <div class="fmt">
+      <p class="fmt__name">rss</p>
+      <pre><code><span class="t">&lt;item&gt;</span>
+  <span class="t">&lt;title&gt;</span>Juno-60<span class="t">&lt;/title&gt;</span>
+  <span class="t">&lt;link&gt;</span>https://…/juno<span class="t">&lt;/link&gt;</span>
+<span class="t">&lt;/item&gt;</span></code></pre>
+    </div>
+    <div class="fmt">
+      <p class="fmt__name">json feed</p>
+      <pre><code>{<span class="k">"items"</span>: [
+  {<span class="k">"title"</span>: <span class="q">"Juno-60"</span>,
+   <span class="k">"url"</span>: <span class="q">"https://…/juno"</span>}
+]}</code></pre>
+    </div>
+    <div class="fmt">
+      <p class="fmt__name">edn</p>
+      <pre><code>[{<span class="n">:title</span> <span class="q">"Juno-60"</span>
+  <span class="n">:link</span>  <span class="q">"https://…/juno"</span>}]</code></pre>
+    </div>
+  </div>
+</section>
+
+<!-- FINE PRINT -->
+<section class="section" id="fine-print">
+  <div class="split">
+    <p class="eyebrow split__aside"><span class="eyebrow__num">06</span>fine-print</p>
+    <div class="split__main">
+      <p class="statement">Built for tinkering, not for everyone.
+        <span>Feedxcavator is an experiment. It is not a hosted service and not a one-click app for end users.</span></p>
+      <ul class="ticks ticks--muted">
+        <li>You run it yourself, on your own machine, with Java 17 or newer.</li>
+        <li>The interesting parts are written in Clojure, so expect to read a little code.</li>
+        <li>Rough edges are part of the deal. Poke around in the live demo before you commit.</li>
+      </ul>
+      <div class="cta">
+        <a class="btn btn--lg" href="https://gchristensen.github.io/feedxcavator/demo/console.html">Open the live demo</a>
+        <a class="btn btn--lg btn--ghost" href="https://github.com/GChristensen/feedxcavator#readme">Read the docs</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer class="site-footer">
+  <span class="brand brand--foot"><img src="img/logo.png" width="20" height="21" alt="">Feedxcavator</span>
+  <span>&copy; g/christensen &middot; GNU GPL v3</span>
+  <a href="https://github.com/GChristensen/feedxcavator">github.com/GChristensen/feedxcavator</a>
+</footer>
+
+</body>
+</html>

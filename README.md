@@ -2,7 +2,7 @@
 
 This application provides a framework to convert various data sources to
 [RSS](https://en.wikipedia.org/wiki/RSS) and serve the resulting feeds.
-Feedxcavator allows program feed extraction in a simple Clojure-based
+Feedxcavator allows to program feed extraction in a simple Clojure-based
 [DSL](https://en.wikipedia.org/wiki/Domain-specific_language) directly through
 the web UI (see the [demo](https://gchristensen.github.io/feedxcavator/demo/console.html)). 
 This allows to perform arbitrary
@@ -67,6 +67,7 @@ selectors: # CSS selectors of feed elements
   summary: div.preview # item description
   image: div.cover img # item cover image
   author: div.user-name # the name of item author
+  category: div.category # post single category
 pages: # pagination parameters
   include-source: true # include the URL supplied in the "source" parameter into the set of processed pages
   path: '/?page=%n' # page path template, appended to the source URL
@@ -132,6 +133,7 @@ Clojure maps with the following set of fields:
   :title "Headline Title" 
   :link "Headline URL" 
   :author "Author name (optional)"
+  :category "Article single category (optional)"
   :summary "Article summary (optional)" 
   :image "Image URL (optional)"
   :image-type "image/mime-type (optional)"
