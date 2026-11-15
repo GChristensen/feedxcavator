@@ -55,6 +55,10 @@ directory, `handlers/`, then `tasks.yaml` and `schedules.yaml`.
 
 - `lib/` files evaluate directly into the shared namespace. A failure abandons the load and keeps the previous
   registry (at startup there is none, so the rest loads without that file).
+- A `lib/` folder in a group folder under `feeds/` (WS2-9) is a group library: one unit, evaluated into a copy of
+  the enclosing group's namespace and never merged into the shared one. Feeds in the group start from that copy, so
+  `_merge` skips names a feed only inherited. `extends` searches group libs nearest first, then `lib/`
+  (`template_loader(root, feed_dir)`); a template's own `extends` searches on from its directory.
 - Each feed directory and each handler file is a unit: it evaluates into a copy of the namespace, and its names
   and registrations are merged only if every file succeeds. This is what isolates a broken feed.
 - Registrations go through `workspace.register`, called by the decorators in `userlib.py` and the macros in

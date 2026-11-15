@@ -276,7 +276,7 @@ class FeedDefinition(BaseModel):
         "ASCII letters, digits, dot, dash, underscore and tilde. Defaults to the directory name"))
     enabled: bool = True
     tags: list[str] = []
-    extends: str | None = Field(None, description="A YAML template under lib/ to inherit from")
+    extends: str | None = Field(None, description="A YAML template to inherit from, under a group lib/ or the workspace lib/")
     source: str | list[str] | None = None
     mode: Literal["selectors", "auto"] | None = None
     fetch: FetchOptions = FetchOptions()
@@ -379,16 +379,32 @@ def deep_merge(base, over):
     return over
 
 
-def resolve_extends(data: dict, load_template, _seen=()) -> dict:
-    """Merges the definition over its template chain. `load_template(name)` returns a plain dict."""
+def resolve_extends(data: dict, load_template, _seen=(), _files=()) -> dict:
+    """Merges the definition over its template chain. `load_template(name)` returns a plain dict.
+
+    A loader with a `locate(name, files)` attribute (workspace.template_loader) resolves names
+    from where the referring template lives, skipping the template files already in the chain, so
+    a group template can extend a template of the same name further out (WS2-9). It returns
+    `(template, loader for the template's own extends, file)`, or None when only files already in
+    the chain match."""
     name = data.get("extends")
     if not name:
         return data
     name = str(name)
+    locate = getattr(load_template, "locate", None)
+    if locate is not None:
+        found = locate(name, _files)
+        if found is None:
+            raise ValueError(f"cyclic 'extends': {' -> '.join((*_seen, name))}")
+        template, inner, file = found
+        return _merge_template(resolve_extends(normalize(template), inner, (*_seen, name), (*_files, file)), data)
     if name in _seen:
         raise ValueError(f"cyclic 'extends': {' -> '.join((*_seen, name))}")
     template = load_template(name)
-    template = resolve_extends(normalize(template), load_template, (*_seen, name))
+    return _merge_template(resolve_extends(normalize(template), load_template, (*_seen, name)), data)
+
+
+def _merge_template(template: dict, data: dict) -> dict:
     template.pop("id", None)
     merged = deep_merge(template, data)
     merged.pop("extends", None)

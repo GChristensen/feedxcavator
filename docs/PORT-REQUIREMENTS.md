@@ -84,6 +84,7 @@ workspace/
       extract.hy           optional feed-local code
     video/channel-x/
       feed.yaml
+    video/lib/             optional group library: code and templates for feeds under video/ (WS2-9)
   handlers/
     telegram-hook.py
   tasks.yaml
@@ -109,6 +110,18 @@ WS2-8. The workspace should work as a git repository. The server must not create
 ones the user asks for (new feed, saved file, renamed suffix), and must not write caches or compiled output into it.
 It must never run git commands in the workspace (D-11).
 
+WS2-9. A group folder under `feeds/` (`feeds/` itself included) may contain a `lib/` directory that is not a feed (has
+no `feed.yaml`): the group library. It is not searched for feeds.
+
+- Its `.py` and `.hy` files, ordered as in UC2-3 (its own `_order.yaml`, otherwise alphabetically by path), load as
+  one unit into a copy of the namespace of the enclosing group (for the outermost group, the shared namespace), on
+  first use, before the code of the first feed in the group. Feeds of the group and of its nested groups start from
+  that namespace. Names defined in a group library do not enter the shared namespace; registrations (extractors,
+  handlers, task functions, proxies) are global, as from any other file.
+- If a group library fails to evaluate, the error is reported and every feed in the group and its nested groups is
+  disabled as in UC2-8, keeping its identity. The rest of the workspace loads normally.
+- It may hold templates: `extends` looks in the group libraries of the feed, nearest first, then in `lib/` (FD2-6).
+
 ## 5. User code
 
 ### 5.1 Languages
@@ -125,12 +138,13 @@ UC2-3. A full load evaluates, in this order:
 
 1. the prelude,
 2. `lib/`, in the order given by `lib/_order.yaml`, otherwise alphabetically by path,
-3. the code files of each feed, feeds in alphabetical order of path, files within a feed alphabetically,
+3. the code files of each feed, feeds in alphabetical order of path, files within a feed alphabetically; the group
+   libraries of a feed (WS2-9) load before its first feed,
 4. `handlers/`, alphabetically.
 
 `tasks.yaml` and `schedules.yaml` are read after the code, so they can refer to functions defined in it (TSK2-6).
 
-UC2-4. Feed-local code may rely on the prelude and `lib/`. Relying on names defined by another feed's files is
+UC2-4. Feed-local code may rely on the prelude, `lib/` and the libraries of its groups (WS2-9). Relying on names defined by another feed's files is
 unsupported, because load order between feeds is not a contract.
 
 ### 5.3 Isolation of failures
@@ -289,8 +303,10 @@ Other top-level keys remain available to extractors as extra fields (FD-2). `cha
 `fetch`. `task` (singular) is still accepted and treated as a one-element `tasks`.
 
 FD2-6. `extends: <path>` names a YAML template under `lib/` (for example `extends: forums/phpbb` reads
-`lib/forums/phpbb.yaml`). The feed's own keys are deep-merged over the template's: maps merge, other values replace.
-Templates may extend other templates. Cycles are an error. A template is not a feed and has no `id`.
+`lib/forums/phpbb.yaml`), or under the `lib/` of one of the feed's groups (WS2-9), the nearest found first. The
+feed's own keys are deep-merged over the template's: maps merge, other values replace. Templates may extend other
+templates; a template's `extends` is looked up from the directory the template is in outward, skipping templates
+already in the chain, so a group template can extend a template of the same name in `lib/`. Cycles are an error. A template is not a feed and has no `id`.
 
 FD2-7. The "New Feed" template (FD-6) is updated to the new fields, with only `title`, `suffix`, and `source` active.
 `id` appears as a commented-out example.

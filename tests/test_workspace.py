@@ -222,3 +222,60 @@ def test_signature_skips_unchanged_reloads(ws):
     (ws.root / "feeds/a/feed.yaml").write_text(
         (ws.root / "feeds/a/feed.yaml").read_text() + "tags: [x]\n")
     assert workspace.load(force=False).generation == first.generation + 1
+
+
+def test_group_libraries(ws):
+    registry = ws({
+        "lib/util.py": "def shout(s):\n    return s.upper()\n",
+        "lib/base.yaml": "selectors: {item: div}\nlimit: 5\n",
+        "feeds/news/lib/common.py": "def news_title(s):\n    return 'news: ' + shout(s)\n"
+                                    "@extractor('news-x')\ndef news_x(feed):\n    return [{'title': news_title('a')}]\n",
+        "feeds/news/lib/base.yaml": "extends: base\nselectors: {item: article}\n",
+        "feeds/news/lib/local/lib.hy": "(defn local-title [s] (+ \"local \" (news-title s)))\n",
+        "feeds/news/local/lib/more.py": "def deeper(s):\n    return local_title(s) + '!'\n",
+        "feeds/news/local/city/feed.yaml": "title: city\nsource: https://e.test/c\nextends: base\n",
+        "feeds/news/local/city/x.py": "@extractor('city-x')\ndef city_x(feed):\n    return [{'title': deeper('c')}]\n"
+                                      "CITY = 1\n",
+        "feeds/news/paper/feed.yaml": "title: paper\nsource: https://e.test/p\nextends: base\nextractor: news-x\n",
+        "feeds/other/feed.yaml": "title: other\nsource: https://e.test/o\nextends: base\n",
+        "feeds/other/x.py": "HAS_NEWS = 'news_title' in globals()\n",
+    }, startup=True)
+    assert registry.errors == []
+    assert sorted(registry.feeds) == ["news/local/city", "news/paper", "other"]  # lib/ is not a feed group
+    city = registry.feeds["news/local/city"].feed
+    assert registry.find_extractor("city-x").fn(city) == [{"title": "local news: C!"}]
+    assert registry.find_extractor("news-x") is not None  # registrations are global
+    # group names stay in the group, the feed's own names are shared as before (UC2-9)
+    ns = registry.namespace
+    assert "news_title" not in ns and "local_title" not in ns and "deeper" not in ns and ns["CITY"] == 1
+    assert ns["HAS_NEWS"] is False
+    # templates resolve from the nearest group lib/, then lib/
+    assert city["selectors"]["item"] == "article" and city["limit"] == 5
+    assert registry.feeds["other"].feed["selectors"]["item"] == "div"
+
+
+def test_broken_group_library_disables_its_group(ws):
+    registry = ws({
+        "feeds/news/lib/bad.py": "X = 1\nraise RuntimeError('boom')\n",
+        "feeds/news/a/feed.yaml": FEED.format(title="a"),
+        "feeds/b/feed.yaml": FEED.format(title="b"),
+    }, startup=True)
+    assert not registry.abandoned
+    assert registry.feeds["news/a"].status == "error" and "feeds/news/lib/bad.py" in registry.feeds["news/a"].error
+    assert registry.feeds["news/a"].suffix == "a"  # the identity is kept, so stored output is still served
+    assert registry.feeds["b"].status == "ok"
+    assert [e.line for e in registry.errors_for("feeds/news/lib/bad.py")] == [2]
+
+
+def test_feed_named_lib_is_still_a_feed(ws):
+    registry = ws({"feeds/lib/feed.yaml": FEED.format(title="lib")})
+    assert "lib" in registry.feeds and registry.feeds["lib"].status == "ok"
+
+
+def test_group_template_cycle(ws):
+    registry = ws({
+        "lib/base.yaml": "extends: base\n",
+        "feeds/g/lib/base.yaml": "extends: base\n",
+        "feeds/g/f/feed.yaml": "title: f\nsource: https://e.test/f\nextends: base\n",
+    }, startup=True)
+    assert "cyclic 'extends': base -> base -> base" in registry.feeds["g/f"].error

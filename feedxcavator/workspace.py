@@ -213,6 +213,7 @@ class _Unit:
         self.label = label
         self.file = label
         self.pending: list[Registration] = []
+        self.module: types.ModuleType | None = None
 
 
 def register(kind: str, name: str, fn, **meta):
@@ -331,15 +332,21 @@ def describe_error(exc: BaseException, relpath: str) -> FileError:
     return FileError(relpath, line, f"{type(exc).__name__}: {message or exc}", text)
 
 
-def _merge(shared: types.ModuleType, unit_module: types.ModuleType):
-    """UC2-9: the names a unit added or changed go back into the shared namespace."""
+def _merge(shared: types.ModuleType, unit_module: types.ModuleType, base: types.ModuleType | None = None):
+    """UC2-9: the names a unit added or changed go back into the shared namespace. Names the unit
+    only inherited from `base` (a group library, WS2-9) do not."""
     target = shared.__dict__
+    origin = (base or shared).__dict__
     for key, value in unit_module.__dict__.items():
         if key in ("__file__", "__name__", "__builtins__"):
             continue
         if key in ("_hy_macros", "_hy_reader_macros"):
             if isinstance(value, dict):
-                target.setdefault(key, {}).update(value)
+                inherited = origin.get(key) if isinstance(origin.get(key), dict) else {}
+                target.setdefault(key, {}).update(
+                    {k: v for k, v in value.items() if k not in inherited or inherited[k] is not v})
+            continue
+        if key in origin and origin[key] is value:
             continue
         if key not in target or target[key] is not value:
             target[key] = value
@@ -379,7 +386,8 @@ def _lib_order(lib: Path, files: list[Path]) -> list[Path]:
 
 
 def feed_dirs(root: Path) -> list[Path]:
-    """WS2-3: directories under feeds/ that contain feed.yaml. Feeds do not nest."""
+    """WS2-3: directories under feeds/ that contain feed.yaml. Feeds do not nest, and group
+    libraries (WS2-9) are not searched for feeds."""
     feeds_root = root / "feeds"
     found = []
 
@@ -392,7 +400,8 @@ def feed_dirs(root: Path) -> list[Path]:
             found.append(directory)
             return
         for entry in entries:
-            if entry.is_dir() and entry.name not in IGNORED_DIRS and not entry.name.startswith("."):
+            if entry.is_dir() and entry.name not in IGNORED_DIRS and not entry.name.startswith(".") \
+                    and not _is_group_lib(entry):
                 walk(entry)
 
     if feeds_root.is_dir():
@@ -400,20 +409,77 @@ def feed_dirs(root: Path) -> list[Path]:
     return sorted(found, key=lambda p: p.relative_to(feeds_root).as_posix())
 
 
-def template_loader(root: Path):
-    def load(name: str) -> dict:
-        base = (root / "lib" / name).resolve()
-        if not base.is_relative_to((root / "lib").resolve()):
-            raise ValueError(f"template '{name}' is outside lib/")
-        for candidate in (base.with_name(base.name + ".yaml"), base.with_name(base.name + ".yml"), base):
-            if candidate.is_file():
+def _is_group_lib(directory: Path) -> bool:
+    """WS2-9: a `lib` directory in a group folder (feeds/ itself included) that is not a feed."""
+    return directory.name == "lib" and directory.is_dir() and not (directory / "feed.yaml").is_file() \
+        and not (directory.parent / "feed.yaml").is_file()
+
+
+def group_dirs(root: Path, feed_dir: Path) -> list[Path]:
+    """The group folders of a feed, from feeds/ down to the feed's parent."""
+    feeds_root = (root / "feeds").resolve()
+    feed_dir = feed_dir.resolve()
+    if not feed_dir.is_relative_to(feeds_root) or feed_dir == feeds_root:
+        return []
+    groups, current = [], feed_dir.parent
+    while True:
+        groups.append(current)
+        if current == feeds_root or current == current.parent:
+            break
+        current = current.parent
+    return groups[::-1]
+
+
+def template_dirs(root: Path, feed_dir: Path | None = None) -> list[Path]:
+    """FD2-6, WS2-9: where `extends` looks, nearest first: the group libraries of the feed, then lib/."""
+    groups = group_dirs(root, feed_dir) if feed_dir is not None else []
+    return [g / "lib" for g in reversed(groups) if _is_group_lib(g / "lib")] + [root / "lib"]
+
+
+def template_loader(root: Path, feed_dir: Path | None = None):
+    """Loads `extends` templates for a feed in `feed_dir` (or for no feed: lib/ only)."""
+    return _make_template_loader(root, template_dirs(root, feed_dir))
+
+
+def _make_template_loader(root: Path, dirs: list[Path]):
+    def locate(name: str, chain=()):
+        """The first match not already in `chain`, with a loader that searches on from its directory."""
+        escaped, cyclic = True, False
+        for index, lib in enumerate(dirs):
+            base = (lib / name).resolve()
+            if not base.is_relative_to(lib.resolve()):
+                continue
+            escaped = False
+            for candidate in (base.with_name(base.name + ".yaml"), base.with_name(base.name + ".yml"), base):
+                if not candidate.is_file():
+                    continue
+                if str(candidate) in chain:
+                    cyclic = True
+                    break
                 data = feeddef.plain(feeddef.load_yaml(candidate.read_text(encoding="utf-8")))
                 if not isinstance(data, dict):
                     raise ValueError(f"template '{name}' must be a mapping")
-                return data
-        raise ValueError(f"template '{name}' not found (expected lib/{name}.yaml)")
+                return data, _make_template_loader(root, dirs[index:]), str(candidate)
+        if cyclic:
+            return None
+        if escaped:
+            raise ValueError(f"template '{name}' is outside lib/")
+        where = " or ".join(f"{_rel(root, lib)}/{name}.yaml" for lib in dirs)
+        raise ValueError(f"template '{name}' not found (expected {where})")
 
+    def load(name: str) -> dict:
+        found = locate(name)
+        return found[0]
+
+    load.locate = locate
     return load
+
+
+def _rel(root: Path, path: Path) -> str:
+    try:
+        return path.resolve().relative_to(root.resolve()).as_posix()
+    except ValueError:
+        return path.as_posix()
 
 
 def signature(root: Path) -> tuple:
@@ -437,11 +503,16 @@ def signature(root: Path) -> tuple:
 # the load -----------------------------------------------------------------------------------
 
 
-def _load_unit(registry, shared, label, files: list[tuple[str, Path]], isolate=True) -> FileError | None:
-    """Evaluates the files of one unit. On success merges its names and commits its registrations."""
+def _load_unit(registry, shared, label, files: list[tuple[str, Path]], isolate=True,
+               base: types.ModuleType | None = None, merge=True) -> FileError | None:
+    """Evaluates the files of one unit. On success merges its names and commits its registrations.
+
+    An isolated unit evaluates into a copy of `base` (by default the shared namespace). With
+    `merge` false its names stay in its own module, `registry._last_unit.module` (WS2-9)."""
     global _unit
     unit = _Unit(registry, label)
-    module = _new_module(shared.__dict__) if isolate else shared
+    module = _new_module((base or shared).__dict__) if isolate else shared
+    unit.module = module
     _unit = unit
     try:
         for relpath, path in files:
@@ -456,8 +527,8 @@ def _load_unit(registry, shared, label, files: list[tuple[str, Path]], isolate=T
                 return describe_error(e, relpath)
     finally:
         _unit = None
-    if isolate:
-        _merge(shared, module)
+    if isolate and merge:
+        _merge(shared, module, base)
     _commit(unit)
     registry._last_unit = unit
     return None
@@ -489,11 +560,44 @@ def build(root: Path, previous: Registry | None, startup: bool) -> Registry:
                 return registry
 
     # feeds/
-    loader = template_loader(root)
     feeds_root = root / "feeds"
     seen_keys: dict[str, str] = {}  # ids, and lower-cased suffixes: stores are named by them
     seen_suffixes: dict[str, str] = {}
+    groups: dict[Path, types.ModuleType | FileError] = {}  # group folder -> its namespace, or its error
+
+    def group_namespace(directory: Path) -> types.ModuleType | FileError:
+        """WS2-9: the namespace the feeds of a directory start from, loading group libraries on first use."""
+        base: types.ModuleType = shared
+        for group in group_dirs(root, directory):
+            if group not in groups:
+                lib = group / "lib"
+                if not _is_group_lib(lib):
+                    groups[group] = base
+                else:
+                    lib_rel = _rel(root, lib)
+                    try:
+                        code = _lib_order(lib, _code_files(lib, recursive=True))
+                    except ValueError as e:
+                        registry.errors.append(FileError(f"{lib_rel}/_order.yaml", None, str(e)))
+                        code = _code_files(lib, recursive=True)
+                    if not code:
+                        groups[group] = base
+                    else:
+                        files = [(_rel(root, p), p) for p in code]
+                        error = _load_unit(registry, shared, lib_rel, files, base=base, merge=False)
+                        if error:
+                            registry.errors.append(error)
+                            groups[group] = error
+                        else:
+                            groups[group] = registry._last_unit.module
+            result = groups[group]
+            if isinstance(result, FileError):
+                return result
+            base = result
+        return base
+
     for directory in feed_dirs(root):
+        loader = template_loader(root, directory)
         path = directory.relative_to(feeds_root).as_posix()
         rel_dir = directory.relative_to(root).as_posix()
         yaml_rel = f"{rel_dir}/feed.yaml"
@@ -557,9 +661,14 @@ def build(root: Path, previous: Registry | None, startup: bool) -> Registry:
             fail(taken[0], feeddef.line_of(tree, (taken[1],)))
             continue
 
+        base = group_namespace(directory)
+        if isinstance(base, FileError):  # WS2-9: a broken group library disables the feeds of its group
+            fail(f"the group library failed to load: {base.path}: {base.message}")
+            continue
+
         if code:  # WS2-4, UC2-8, UC2-9
             files = [(p.relative_to(root).as_posix(), p) for p in code]
-            error = _load_unit(registry, shared, rel_dir, files)
+            error = _load_unit(registry, shared, rel_dir, files, base=base)
             if error:
                 fail(error.message, error.line, error.traceback, file=error.path)
                 continue

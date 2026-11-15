@@ -36,7 +36,7 @@ onMounted(async () => {
     <p class="muted">
       Everything below is available in every workspace file without imports. Python names use snake_case;
       in Hy the same names are written with dashes. Files load in this order: the prelude, <code>lib/</code>,
-      the code of each feed, <code>handlers/</code>, then <code>tasks.yaml</code> and <code>schedules.yaml</code>.
+      the code of each feed (after the <code>lib/</code> folders of its groups), <code>handlers/</code>, then <code>tasks.yaml</code> and <code>schedules.yaml</code>.
     </p>
     <div v-for="section in visible" :key="section.category">
       <h2>{{ section.category }}</h2>

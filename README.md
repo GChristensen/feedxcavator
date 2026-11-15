@@ -68,7 +68,7 @@ suffix: feed-suffix            # the feed is served at /feed/feed-suffix; defaul
 id: 0123456789abcdef0123456789abcdef  # keeps the stored state when the suffix changes (see "Feed identity")
 enabled: true
 tags: [news]                   # tasks can select feeds by tag
-extends: forums/phpbb          # inherit from the template lib/forums/phpbb.yaml; maps are merged
+extends: forums/phpbb          # inherit from forums/phpbb.yaml in a group lib/ or in lib/; maps are merged
 source: https://example.com    # a URL or a list of URLs
 mode: selectors                # or auto
 fetch:
@@ -183,8 +183,11 @@ Some differences to keep in mind:
 - Hy reads `:key value` in a call as a keyword argument, so option values are written as strings:
   `(fetch-url url :as "html")`. For the same reason `(distinct-by "link" coll)` takes the key as a string.
 - `(:key m)` returns None for a missing key. A feed is a read-only mapping: `feed["source"]`, `feed.source` and
-  `(:source feed)` are the same.
-- Headlines are plain dicts with string keys. `(assoc h :title "x")` sets the `"title"` key.
+  `(:source feed)` are the same. Hy mangles dashes in keywords, so `(:image-type h)` reads the `"image_type"`
+  key; read a key that contains a dash with `(get h "item-id")`.
+- Headlines are plain dicts with string keys, and `assoc` and the other collection functions take the keys as
+  strings: `(assoc h "title" "x")`. `(assoc h :title "x")` does not work, because `:title` in a call is a
+  keyword argument.
 
 ## Custom feed extractors
 
@@ -472,9 +475,9 @@ forums, and the feed selectors describe the thread list of a forum page.
         :setv page (fetch-url (:link thread) :as "html")
         (do (log.write (+ "visited: " (:link thread)))
             (assoc thread
-                   :title (html-unescape (:title thread))
-                   :image (q1 page ".post_text img::attr(src)")
-                   :summary (outer-html ($1 page ".post_text"))))))
+                   "title" (html-unescape (:title thread))
+                   "image" (q1 page ".post_text img::attr(src)")
+                   "summary" (outer-html ($1 page ".post_text"))))))
 ```
 
 Extract data from a JSON API. The `params` field holds the user id.
@@ -510,7 +513,7 @@ transform: shout
 
 ```hy
 (defn shout [headline]
-  (assoc headline :title (.upper (:title headline))))
+  (assoc headline "title" (.upper (:title headline))))
 ```
 
 A task function that runs after the morning feeds:
@@ -586,9 +589,11 @@ On Windows, `feedxcavator.cmd` can be registered as a service with [WinSW](https
 workspace/
   lib/                     shared code, loaded first (lib/_order.yaml sets an explicit order)
     forums/phpbb.yaml      a template for `extends: forums/phpbb`
-  feeds/news/local/city-paper/
-    feed.yaml              the feed; the directory path is its group, the directory name its default suffix
-    extract.hy             feed-local code
+  feeds/news/
+    lib/                   group library: code and templates for the feeds under news/
+    local/city-paper/
+      feed.yaml            the feed; the directory path is its group, the directory name its default suffix
+      extract.hy           feed-local code
   handlers/
   tasks.yaml
   schedules.yaml
@@ -598,6 +603,13 @@ workspace/
 Edits made in the console, in an IDE or by git are picked up the same way. A broken feed file disables only that
 feed; a broken `lib/` file keeps the previously loaded state running. If a `lib/` file fails at startup, there is
 no previous state to keep, so the rest of the workspace loads without that file and the error is reported.
+
+A group folder under `feeds/` may have its own `lib/` directory. Its code loads before the feeds of the group, and
+the feeds in the group and in its subgroups can call what it defines; other feeds do not see those names (extractors
+and handlers it registers are global, as always). It can also hold templates: `extends: base` looks for `base.yaml`
+in the group libraries of the feed, nearest first, then in the workspace `lib/`. A template can extend a template
+of the same name further out, so `feeds/news/lib/base.yaml` may start with `extends: base` to refine
+`lib/base.yaml`. A broken group library disables only the feeds of its group.
 
 ## Feed identity
 

@@ -171,7 +171,8 @@ def diagnostics_for(path: str, content: str) -> list[dict]:
     name = Path(path).name
     try:
         if name == "feed.yaml" and path.startswith("feeds/"):
-            return [d.as_dict() for d in feeddef.diagnose(content, workspace.template_loader(root()))]
+            loader = workspace.template_loader(root(), (root() / path).parent)
+            return [d.as_dict() for d in feeddef.diagnose(content, loader)]
         if path == "tasks.yaml":
             taskdefs.parse_tasks(content)
         elif path == "schedules.yaml":
@@ -362,7 +363,7 @@ def _feed_from_text(path: str, text: str):
     target = resolve(path)
     feed_dir = target.parent
     try:
-        definition, _ = feeddef.parse_definition(text, workspace.template_loader(root()))
+        definition, _ = feeddef.parse_definition(text, workspace.template_loader(root(), feed_dir))
     except feeddef.DefinitionError as e:
         raise ApiError(400, "validation failed", diagnostics=[d.as_dict() for d in e.diagnostics]) from None
     feed_path = feed_dir.relative_to(root() / "feeds").as_posix()
