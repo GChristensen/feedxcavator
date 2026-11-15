@@ -1,0 +1,27 @@
+# systemd user unit (LFC-1). Install with:
+#   cp deploy/feedxcavator.service ~/.config/systemd/user/
+#   systemctl --user daemon-reload && systemctl --user enable --now feedxcavator
+#   loginctl enable-linger "$USER"     # keep it running without a login session
+#
+# Adjust WorkingDirectory to the installation directory.
+
+[Unit]
+Description=Feedxcavator
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/feedxcavator
+Environment=FEEDXCAVATOR_SUPERVISED=1
+Environment=PATH=%h/feedxcavator:/usr/local/bin:/usr/bin:/bin
+ExecStart=%h/feedxcavator/.venv/bin/python -m feedxcavator run
+# exit code 3 is a restart requested from the console
+Restart=on-failure
+RestartForceExitStatus=3
+RestartSec=1
+KillMode=control-group
+TimeoutStopSec=20
+
+[Install]
+WantedBy=default.target

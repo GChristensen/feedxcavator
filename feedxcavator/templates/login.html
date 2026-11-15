@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Feedxcavator - Login</title>
+  <link rel="icon" href="/favicon.ico">
+  <style>
+    body { background: #2b2b2b; color: #c8c8c8; font: 14px Roboto, "Segoe UI", Arial, sans-serif; margin: 0;
+           display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+    form { background: #3c3f41; border: 1px solid #555; border-radius: 4px; padding: 24px 28px; width: 280px; }
+    h1 { font-size: 20px; font-weight: 400; margin: 0 0 18px; color: #e0e0e0; }
+    label { display: block; margin: 12px 0 4px; }
+    input { width: 100%; box-sizing: border-box; padding: 7px 8px; background: #2b2b2b; color: #e0e0e0;
+            border: 1px solid #5a5a5a; border-radius: 3px; font: inherit; }
+    input:focus { outline: none; border-color: #4a88c7; }
+    button { margin-top: 18px; width: 100%; padding: 8px; background: #365880; color: #fff; border: 1px solid #4a88c7;
+             border-radius: 3px; font: inherit; cursor: pointer; }
+    button:hover { background: #3f6796; }
+    .error { color: #ff6b68; margin: 0 0 6px; }
+  </style>
+</head>
+<body>
+  <form method="post" action="/login">
+    <h1>Feedxcavator</h1>
+    {% if failed %}<p class="error">Wrong user name or password.</p>{% endif %}
+    {% csrf_token %}
+    <input type="hidden" name="next" value="{{ next }}">
+    <label for="username">User name</label>
+    <input id="username" name="username" autocomplete="username" autofocus required>
+    <label for="password">Password</label>
+    <input id="password" name="password" type="password" autocomplete="current-password" required>
+    <button type="submit">Log in</button>
+  </form>
+</body>
+</html>

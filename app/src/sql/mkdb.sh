@@ -1,1 +1,0 @@
-java -classpath '../.local/jdbc/h2-2.2.224.jar' org.h2.tools.RunScript -url 'jdbc:h2:./data/feedxcavator;MODE=MYSQL' -script ../app/src/sql/tables.sql

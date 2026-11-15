@@ -1,0 +1,56 @@
+# Feedxcavator configuration. Copy to config.yml in the installation directory.
+# Every key is optional; the values below are the defaults unless noted.
+
+port: 10000                      # or FEEDXCAVATOR_PORT
+#host: 0.0.0.0                   # or FEEDXCAVATOR_HOST
+
+# Base URLs used in generated links
+hostname: 'http://feeds:10000'            # when no request is in progress
+websub-hostname: 'http://feeds:10000'     # feed URLs and the hub URL
+secure-hostname: 'https://feeds:11000'    # forward links requested with https
+
+authentication: true             # false disables the login requirement
+user: user                       # set the password with: feedxcavator set-password
+
+websub: true                     # false disables the hub
+stacktraces: true                # false stops returning tracebacks in error pages
+production: false                # true returns a bare 500 page from /feed/ on errors
+execute-daily-service-task: true # purge old images, log entries, history and run records at 04:00
+
+# A Django database URL. SQLite in WAL mode by default; PostgreSQL also works:
+#   postgres://user:password@localhost:5432/feedxcavator   (pip install "feedxcavator[postgres]")
+database-connection-url: 'sqlite:///data/feedxcavator.db'
+
+workspace: workspace             # the directory with feeds, code, tasks.yaml and schedules.yaml
+
+# Worker
+worker-parallel: 6               # workers for feeds with parallel: true
+worker-sequential: 1             # workers for feeds with parallel: false
+run-history-days: 30             # task and feed run records are pruned after this many days
+
+# Browser automation (used only by feeds with fetch.backend: browser and by browser() in code)
+browser-engine: patchright       # patchright | camoufox | playwright
+browser-channel: chrome          # the installed browser patchright drives; falls back to its bundled Chromium
+browser-pool-size: 1
+#browser-headless: false         # default: headful when a display or Xvfb is available on Linux, else headless
+
+# Proxies, referred to by name from fetch.proxy in feed.yaml and the proxy option of fetch_url.
+# Telegram uses the one named default. Schemes: http, https, socks5, socks5h, socks4.
+#proxies:
+#  default: socks5://127.0.0.1:1080
+#  work:
+#    scheme: http
+#    host: proxy.example.com
+#    port: 3128
+#    user: me
+#    password: secret
+
+# nginx serves stored images itself when this is set (see deploy/nginx.conf)
+#x-accel: /protected-blobs/
+
+# Telegram (log in once with: feedxcavator telegram-login)
+#tg-api-id: 123456
+#tg-api-hash: 0123456789abcdef0123456789abcdef
+
+# A local Python/Hy REPL attached to the worker's namespace, bound to 127.0.0.1
+#repl-port: 7888                 # or FEEDXCAVATOR_REPL_PORT

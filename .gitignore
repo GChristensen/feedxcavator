@@ -1,0 +1,14 @@
+/.idea
+/.local
+/.claude
+.venv/
+__pycache__/
+*.pyc
+*.iml
+/data/
+/log/
+/workspace/
+/config.yml
+node_modules/
+.pytest_cache/
+*.tmp
