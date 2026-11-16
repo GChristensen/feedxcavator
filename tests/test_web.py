@@ -223,7 +223,7 @@ def test_authentication(ws, client):
         assert client.post("/login", {"username": "user", "password": "wrong", "next": "/console"}).status_code == 401
         ok = client.post("/login", {"username": "user", "password": "correct horse", "next": "/console#log"})
         assert ok.status_code == 302 and ok["Location"] == "/console#log"
-        cookie = ok.cookies["sessionid"]
+        cookie = ok.cookies["feedxcavator_sessionid"]
         assert cookie["httponly"] and cookie["samesite"] == "Strict"  # AUTH2-2
         assert client.get(f"{API}/tree").status_code == 200
         assert client.get("/backend/run/t").content == b"t enqueued"
@@ -240,8 +240,8 @@ def test_csrf_protects_console_api(ws):
     strict = Client(enforce_csrf_checks=True)
     assert strict.get(f"{API}/tree").status_code == 200
     assert strict.post(f"{API}/reload").status_code == 403  # AUTH2-3
-    strict.get("/console")  # sets the csrftoken cookie
-    csrf = strict.cookies["csrftoken"].value
+    strict.get("/console")  # sets the CSRF cookie
+    csrf = strict.cookies["feedxcavator_csrftoken"].value
     assert strict.post(f"{API}/reload", headers={"X-CSRFToken": csrf}).status_code == 200
     assert strict.post("/websub", {"hub.mode": "nonsense"}).status_code == 400  # public routes are exempt
     assert strict.get(f"{API}/log").status_code == 200 and strict.delete(f"{API}/log").status_code == 403  # 17.10

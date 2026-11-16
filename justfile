@@ -40,7 +40,7 @@ deploy:
     robocopy feedxcavator '{{remote}}\feedxcavator' /MIR /XD __pycache__ {{rc}}{{ok}}
     robocopy deploy '{{remote}}\deploy' /MIR {{rc}}{{ok}}
     robocopy docs '{{remote}}\docs' /MIR {{rc}}{{ok}}
-    robocopy . '{{remote}}' pyproject.toml README.md config.example.yml feedxcavator.sh feedxcavator.cmd {{rc}}{{ok}}
+    robocopy . '{{remote}}' pyproject.toml README.md config.example.yml *.sh feedxcavator.cmd {{rc}}{{ok}}
     @echo 'Deployed. Restart the server; if pyproject.toml dependencies changed, reinstall them there first.'
 
 # Replace local data/, workspace/ and config.yml with the server's copy. Images (data/files/blob) are not copied.

@@ -95,7 +95,12 @@ class _Session:
         profile_dir.mkdir(parents=True, exist_ok=True)
         headless = _headless()
         if engine == "camoufox":
-            from camoufox.sync_api import Camoufox
+            try:
+                from camoufox.sync_api import Camoufox
+            except ImportError:
+                raise BrowserError("browser-engine is camoufox, but it is not installed: run "
+                                   "uv pip install --python .venv/bin/python camoufox, then "
+                                   ".venv/bin/python -m camoufox fetch (see the README)") from None
 
             manager = Camoufox(persistent_context=True, user_data_dir=str(profile_dir), headless=headless)
             self._context = manager.__enter__()

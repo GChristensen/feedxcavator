@@ -555,8 +555,48 @@ Commands (`python -m feedxcavator <command>`):
 When `repl-port` is set (or `FEEDXCAVATOR_REPL_PORT`), the worker opens a Python/Hy REPL bound to 127.0.0.1
 that shares the namespace of the workspace code.
 
-The browser backend drives the installed Chrome through patchright. Without Chrome, run
-`python -m patchright install chromium`.
+### Browser engines
+
+`browser-engine` in `config.yml` selects the engine of the worker's browser pool:
+
+| Engine | Browser | Setup |
+|---|---|---|
+| `patchright` (default) | the installed Chrome (`browser-channel`), patched against automation detection | installed with the package; without Chrome, `.venv/bin/python -m patchright install chromium` |
+| `camoufox` | a Firefox build with fingerprint spoofing; harder to detect than patchright on some sites | optional, see below |
+| `playwright` | stock Playwright Chromium, no stealth | not installed with the package: `uv pip install --python .venv/bin/python playwright`, then `.venv/bin/python -m playwright install chromium` |
+
+camoufox is not installed with the package. Install it into the server's virtual environment, then download
+its browser build (stored outside the venv, in the user's cache folder):
+
+```
+uv pip install --python .venv/bin/python "camoufox>=0.4"     # Windows: --python .venv\Scripts\python
+.venv/bin/python -m camoufox fetch
+```
+
+A venv created with `uv venv` has no pip, so `.venv/bin/pip` and `python -m pip` do not exist there. Without uv,
+add pip first:
+
+```
+.venv/bin/python -m ensurepip --upgrade
+.venv/bin/python -m pip install "camoufox>=0.4"
+.venv/bin/python -m camoufox fetch
+```
+
+Then set `browser-engine: camoufox` and restart the server (the browser pool lives in the worker process). If
+the engine is set but the package is missing, a browser feed fails with "browser-engine is camoufox, but it is
+not installed".
+
+Notes:
+
+- On Linux without a display the worker starts Xvfb, when it is installed, so the browser runs headful, which is
+  less detectable than headless. Install it with the distribution's package (`xorg-x11-server-Xvfb` on
+  Fedora/RHEL, `xvfb` on Debian/Ubuntu). `browser-headless: true` forces headless mode.
+- Profiles are kept in `data/browser/<profile>` and are per engine: cookies and sign-ins saved by Chrome do not
+  carry over to camoufox. Use a new profile name (or clear the folder) when switching, and sign in again.
+- `chrome-profile.sh [profile] [url]` opens Chrome with a pool profile, to sign in to a site or solve a captcha
+  by hand. It works for the patchright and playwright engines only. Close it before the worker uses the profile.
+- `firefox-profile.sh [profile] [url]` does the same for the camoufox engine: it starts Camoufox through the
+  camoufox package in the venv and waits until its window is closed.
 
 The server can be restarted from the Settings tab when it runs under the supervisor or the systemd unit.
 Child processes (browsers) are stopped on shutdown. When the server is killed forcibly, the children it left

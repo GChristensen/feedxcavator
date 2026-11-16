@@ -69,6 +69,9 @@ USE_I18N = False
 
 # AUTH2-2
 SESSION_ENGINE = "django.contrib.sessions.backends.db"
+# Cookies ignore the port, so default names would clash with other Django apps on the same host.
+SESSION_COOKIE_NAME = "feedxcavator_sessionid"
+CSRF_COOKIE_NAME = "feedxcavator_csrftoken"
 SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SAMESITE = "Strict"
 SESSION_COOKIE_AGE = 60 * 60 * 24 * 90
