@@ -141,9 +141,54 @@ def test_proxies_from_config(transport, monkeypatch):
     assert transport.calls[-1]["proxy"] == "http://c.test:8080"
     fetch.fetch_url("http://t.test/", proxy="broken")  # no port: a direct connection
     assert transport.calls[-1]["proxy"] is None
-    tg = telegram._proxy()
+    tg = telegram._proxy("default")
     assert tg["proxy_type"] == "socks5" and tg["addr"] == "127.0.0.1" and tg["port"] == 1080
     assert tg["username"] == "me" and tg["password"] == "p@ss"
+    assert telegram._proxy(None) is None and telegram._proxy("missing") is None
+
+
+def test_telegram_proxy_choice(monkeypatch):
+    from feedxcavator import conf, context, telegram
+
+    monkeypatch.setitem(conf.config, "telegram", None)
+    assert telegram.proxy_name() is None  # TG2-1: default-proxy is off by default
+    monkeypatch.setitem(conf.config, "telegram", {"default-proxy": True})
+    assert telegram.proxy_name() == "default"
+    with context.scope(feed={"fetch": {"proxy": "work"}}):
+        assert telegram.proxy_name() == "work"  # the feed's proxy wins over default
+        assert telegram.proxy_name("other") == "other" and telegram.proxy_name(False) is False
+    with context.scope(feed={"fetch": {}}):
+        assert telegram.proxy_name() == "default"
+    monkeypatch.setitem(conf.config, "telegram", {"default-proxy": False})
+    with context.scope(feed={"fetch": {}}):
+        assert telegram.proxy_name() is None
+
+
+def test_telegram_settings(monkeypatch):
+    from feedxcavator import conf, telegram
+
+    monkeypatch.setitem(conf.config, "telegram", None)
+    monkeypatch.setitem(conf.config, "tg-api-id", None)
+    monkeypatch.setitem(conf.config, "tg-api-hash", None)
+    assert not telegram.configured()
+    monkeypatch.setitem(conf.config, "tg-api-id", 123)  # the 3.0.0 keys
+    monkeypatch.setitem(conf.config, "tg-api-hash", "abc")
+    assert telegram.configured() and conf.telegram("api-id") == 123
+    monkeypatch.setitem(conf.config, "telegram", {"api-id": 456, "api-hash": "def"})
+    assert conf.telegram("api-id") == 456 and conf.telegram("api-hash") == "def"
+
+
+def test_telegram_forward_passes_feed_proxy(monkeypatch):
+    from feedxcavator import context, rpc, telegram
+
+    calls = []
+    monkeypatch.setattr(telegram, "in_worker", False)
+    monkeypatch.setattr(rpc, "call", lambda method, *args, **kwargs: calls.append((method, args, kwargs)) or [])
+    with context.scope(feed={"fetch": {"proxy": "work"}}):
+        telegram.get_channel_messages("chan", 5)
+        telegram.notify("hi", 42)
+    assert calls == [("telegram_get_channel_messages", ("chan", 5), {"proxy": "work"}),
+                     ("telegram_notify", ("hi", 42), {"proxy": "work"})]
 
 
 def test_log_fetch_errors(transport):

@@ -481,8 +481,13 @@ appended as `<img>` tags, permalinks as links, and service messages skipped.
 
 TG-2. `telegram.notify(message, chat_id)` sends a text message.
 
-TG-3. Telegram calls are serialized, as in INT-3. A call routes through the proxy named `default` when one is defined.
+TG-3. Telegram calls are serialized, as in INT-3. A call routes through the proxy chosen by TG2-1.
 Whether the client is started and stopped per call (as in 3.0.0) or kept running in the worker is decided with R-4.
+
+TG2-1. A call uses the proxy named by its `proxy` argument (`False` for a direct connection), otherwise the
+`fetch.proxy` of the calling feed, otherwise the proxy named `default` when `telegram.default-proxy` is true (false by
+default), otherwise a direct connection. The proxy is chosen in the calling process, so a call forwarded by TG-4 uses
+the proxy of the feed that made it.
 
 TG-4. The Telegram client runs in the worker (PRC-1). Calls from the web process (a console test) are forwarded to it,
 as for the browser (PRC-4).
@@ -798,7 +803,10 @@ CFG2-3. `database-connection-url` becomes a Django database URL (`sqlite:///data
 `exclusive-jdbc-connection` and `auto-backup-database` are removed.
 
 CFG2-4. New keys: `workspace`, `x-accel`, `worker-parallel`, `worker-sequential`, `browser-pool-size`,
-`browser-headless`, `run-history-days`.
+`browser-headless`, `run-history-days`, and the `service-task` mapping: `enabled` (replaces
+`execute-daily-service-task`, which is still read when `enabled` is absent), `time` (MNT-2, `04:00` by default), and
+`max-age-days` (the MNT-1 age threshold, 2 by default). The `telegram` mapping holds `api-id` and `api-hash`
+(replacing `tg-api-id` and `tg-api-hash`, which are still read when absent) and `default-proxy` (TG2-1).
 
 CFG2-5. CFG-3 environment overrides are kept for the keys that remain.
 

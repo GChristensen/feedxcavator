@@ -7,13 +7,11 @@ from datetime import timedelta
 
 from django.utils import timezone
 
-from feedxcavator import applog, context, filters, runner, storage, workspace
-
-MAX_AGE_HOURS = 48
+from feedxcavator import applog, conf, context, filters, runner, storage, workspace
 
 
 def service_task() -> dict:
-    """Deletes images and log entries older than 48 hours, and prunes history, run records, expired
+    """Deletes images and log entries older than `service-task.max-age-days` (2 by default), and prunes history, run records, expired
     objects and expired subscriptions."""
     from feedxcavator.models import Blob, HistoryKey, KVObject, LogEntry, Subscription
 
@@ -21,8 +19,9 @@ def service_task() -> dict:
         started = time.monotonic()
         counts = {}
         try:
+            days = conf.service_task_max_age_days()
             now = timezone.now()
-            threshold = now - timedelta(hours=MAX_AGE_HOURS)
+            threshold = now - timedelta(days=days)
             old = list(Blob.objects.filter(created_at__lt=threshold))
             failed = 0
             for blob in old:
@@ -33,7 +32,7 @@ def service_task() -> dict:
                     applog.write("error", f"error deleting image {blob.id}: {e}")
             counts["images"] = len(old) - failed
             counts["log_entries"], _ = LogEntry.objects.filter(
-                timestamp__lt=int((time.time() - MAX_AGE_HOURS * 3600) * 1000)).delete()
+                timestamp__lt=int(threshold.timestamp() * 1000)).delete()
             counts["runs"] = runner.prune_runs()
             counts["objects"], _ = KVObject.objects.filter(expires_at__lt=now).delete()
             counts["subscriptions"], _ = Subscription.objects.filter(expires_at__lt=now).delete()
@@ -52,7 +51,7 @@ def service_task() -> dict:
                 "info",
                 f"service task completed in {int((time.monotonic() - started) * 1000)} ms: purged "
                 f"{counts['images']} of {len(old)} images and {counts['log_entries']} log entries older than "
-                f"2 days, {counts['runs']} run records, {counts['history_keys']} history keys, "
+                f"{days:g} days, {counts['runs']} run records, {counts['history_keys']} history keys, "
                 f"{counts['objects']} expired objects, {counts['subscriptions']} expired subscriptions",
             )
         except Exception as e:  # noqa: BLE001

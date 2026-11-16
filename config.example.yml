@@ -15,7 +15,10 @@ user: user                       # set the password with: feedxcavator set-passw
 websub: true                     # false disables the hub
 stacktraces: true                # false stops returning tracebacks in error pages
 production: false                # true returns a bare 500 page from /feed/ on errors
-execute-daily-service-task: true # purge old images, log entries, history and run records at 04:00
+service-task:                    # purge old images, log entries, history and run records daily
+  enabled: true                  # 3.0.0 spelling: execute-daily-service-task
+  time: '04:00'                  # local time to run it, HH:MM
+  max-age-days: 2                # images and log entries older than this many days are deleted
 
 # A Django database URL. SQLite in WAL mode by default; PostgreSQL also works:
 #   postgres://user:password@localhost:5432/feedxcavator   (pip install "feedxcavator[postgres]")
@@ -49,8 +52,11 @@ browser-pool-size: 1
 #x-accel: /protected-blobs/
 
 # Telegram (log in once with: feedxcavator telegram-login)
-#tg-api-id: 123456
-#tg-api-hash: 0123456789abcdef0123456789abcdef
+#telegram:
+#  api-id: 123456                # 3.0.0 spelling: tg-api-id
+#  api-hash: 0123456789abcdef0123456789abcdef   # 3.0.0 spelling: tg-api-hash
+#  default-proxy: false          # a call uses the fetch.proxy of the calling feed; when the feed names none,
+#                                # true routes it through the proxy named default, false connects directly
 
 # A local Python/Hy REPL attached to the worker's namespace, bound to 127.0.0.1
 #repl-port: 7888                 # or FEEDXCAVATOR_REPL_PORT

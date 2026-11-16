@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import re
 import secrets
 from pathlib import Path
 
@@ -22,10 +23,12 @@ DEFAULTS = {
     "user": None,
     "websub": True,
     "database-connection-url": "sqlite:///data/feedxcavator.db",
-    "execute-daily-service-task": False,
+    "execute-daily-service-task": None,  # 3.0.0 spelling of service-task.enabled
+    "service-task": None,  # a mapping, see SERVICE_TASK_DEFAULTS
     "production": False,
-    "tg-api-id": None,
-    "tg-api-hash": None,
+    "telegram": None,  # a mapping, see TELEGRAM_DEFAULTS
+    "tg-api-id": None,  # 3.0.0 spelling of telegram.api-id
+    "tg-api-hash": None,  # 3.0.0 spelling of telegram.api-hash
     # CFG2-4
     "workspace": "workspace",
     "x-accel": None,
@@ -79,6 +82,65 @@ config = load()
 def get(key: str, default=None):
     value = config.get(key)
     return default if value is None else value
+
+
+SERVICE_TASK_DEFAULTS = {
+    "enabled": False,
+    "time": "04:00",  # local time, HH:MM
+    "max-age-days": 2,  # images and log entries older than this are deleted
+}
+
+
+TELEGRAM_DEFAULTS = {
+    "api-id": None,
+    "api-hash": None,
+    "default-proxy": False,  # use the proxy named `default` when the calling feed names no fetch.proxy
+}
+
+
+def _section_value(section: str, name: str, defaults: dict, legacy: dict):
+    """A key of a mapping in config.yml, else its 3.0.0 top-level spelling, else the default."""
+    mapping = get(section) or {}
+    if not isinstance(mapping, dict):
+        raise ValueError(f"{section}: expected a mapping")
+    value = mapping.get(name)
+    if value is None and name in legacy:
+        value = get(legacy[name])
+    return defaults[name] if value is None else value
+
+
+def service_task(name: str):
+    """A key of the `service-task` mapping. `enabled` falls back to `execute-daily-service-task`."""
+    return _section_value("service-task", name, SERVICE_TASK_DEFAULTS, {"enabled": "execute-daily-service-task"})
+
+
+def telegram(name: str):
+    """A key of the `telegram` mapping. The API id and hash fall back to `tg-api-id` and `tg-api-hash`."""
+    return _section_value("telegram", name, TELEGRAM_DEFAULTS, {"api-id": "tg-api-id", "api-hash": "tg-api-hash"})
+
+
+def service_task_time() -> tuple[int, int]:
+    """`service-task.time` as (hour, minute). Unquoted YAML 1.1 reads 04:00 as the base-60 number 240,
+    so an integer is taken as minutes after midnight."""
+    value = service_task("time")
+    if isinstance(value, int) and not isinstance(value, bool):
+        minutes = value
+    else:
+        match = re.fullmatch(r"(\d{1,2}):(\d{2})", str(value).strip())
+        if not match or int(match[2]) > 59:
+            raise ValueError(f"service-task.time: expected HH:MM, got {value!r}")
+        minutes = int(match[1]) * 60 + int(match[2])
+    hour, minute = divmod(minutes, 60)
+    if not 0 <= hour <= 23:
+        raise ValueError(f"service-task.time: {value!r} is not a time of day")
+    return hour, minute
+
+
+def service_task_max_age_days() -> float:
+    value = float(service_task("max-age-days"))
+    if value <= 0:
+        raise ValueError("service-task.max-age-days: must be positive")
+    return value
 
 
 DATA_DIR = HOME / "data"

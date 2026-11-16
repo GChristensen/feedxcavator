@@ -23,22 +23,37 @@ def session_path():
 
 
 def configured() -> bool:
-    return bool(conf.get("tg-api-id") and conf.get("tg-api-hash"))
+    return bool(conf.telegram("api-id") and conf.telegram("api-hash"))
 
 
 def _inactive_reason() -> str | None:
     if not configured():
-        return "Telegram is not configured: set tg-api-id and tg-api-hash in config.yml"
+        return "Telegram is not configured: set telegram.api-id and telegram.api-hash in config.yml"
     if not session_path().with_suffix(".session").exists():
         return "Telegram has no session: run `feedxcavator telegram-login`"
     return None
 
 
-def _proxy():
-    """TG-3: a call routes through the proxy named `default` when one is defined."""
+def proxy_name(proxy=None):
+    """TG2-1: the proxy a call uses, resolved in the calling process. An explicit name wins and False means a
+    direct connection; otherwise the `fetch.proxy` of the current feed, and failing that the proxy named
+    `default` when `telegram.default-proxy` is on."""
+    if proxy is False:
+        return False
+    if proxy:
+        return str(getattr(proxy, "name", proxy))
+    feed = context.current_feed.get()
+    feed_proxy = ((feed.get("fetch") if feed is not None else None) or {}).get("proxy")
+    if feed_proxy:
+        return str(feed_proxy)
+    return "default" if conf.telegram("default-proxy") else None
+
+
+def _proxy(name=None):
+    """The Telethon proxy settings for a proxy name, None for a direct connection."""
     from feedxcavator import fetch
 
-    proxy = fetch.resolve_proxy("default")
+    proxy = fetch.resolve_proxy(name) if name else None
     if not proxy:
         return None
     schemes = {"socks5": "socks5", "socks5h": "socks5", "socks4": "socks4", "socks4a": "socks4"}
@@ -49,12 +64,12 @@ def _proxy():
     }
 
 
-def make_client():
+def make_client(proxy=None):
     from telethon import TelegramClient
 
     session_path().parent.mkdir(parents=True, exist_ok=True)
-    return TelegramClient(str(session_path()), int(conf.get("tg-api-id")), str(conf.get("tg-api-hash")),
-                          proxy=_proxy(), device_model="PC", app_version="4", system_lang_code="en")
+    return TelegramClient(str(session_path()), int(conf.telegram("api-id")), str(conf.telegram("api-hash")),
+                          proxy=_proxy(proxy), device_model="PC", app_version="4", system_lang_code="en")
 
 
 # rendering ------------------------------------------------------------------------------------
@@ -129,8 +144,8 @@ async def _store_media(client, channel: str, message) -> str | None:
     return f"{host}/image/{blob.id}"
 
 
-async def _get_channel_messages(channel: str, limit: int) -> list[dict]:
-    client = make_client()
+async def _get_channel_messages(channel: str, limit: int, proxy=None) -> list[dict]:
+    client = make_client(proxy)
     await client.connect()
     try:
         if not await client.is_user_authorized():
@@ -152,8 +167,8 @@ async def _get_channel_messages(channel: str, limit: int) -> list[dict]:
         await client.disconnect()
 
 
-async def _notify(message: str, chat_id) -> bool:
-    client = make_client()
+async def _notify(message: str, chat_id, proxy=None) -> bool:
+    client = make_client(proxy)
     await client.connect()
     try:
         if not await client.is_user_authorized():
@@ -174,57 +189,59 @@ def _run(coroutine):
             connections.close_all()
 
 
-def _local_get_channel_messages(channel, limit=MESSAGE_LIMIT):
+def _local_get_channel_messages(channel, limit=MESSAGE_LIMIT, proxy=None):
     reason = _inactive_reason()
     if reason:
         applog.write("warning", reason)  # TG-5
         return []
     try:
-        return _run(_get_channel_messages(str(channel), min(int(limit or MESSAGE_LIMIT), MESSAGE_LIMIT)))
+        return _run(_get_channel_messages(str(channel), min(int(limit or MESSAGE_LIMIT), MESSAGE_LIMIT), proxy))
     except Exception as e:  # noqa: BLE001
         applog.write("error", f"Telegram error: {e!r}")
         return []
 
 
-def _local_notify(message, chat_id):
+def _local_notify(message, chat_id, proxy=None):
     reason = _inactive_reason()
     if reason:
         applog.write("warning", reason)
         return None
     try:
-        return _run(_notify(str(message), chat_id))
+        return _run(_notify(str(message), chat_id, proxy))
     except Exception as e:  # noqa: BLE001
         applog.write("error", f"Telegram error: {e!r}")
         return None
 
 
-def _forward(method, *args):
+def _forward(method, *args, **kwargs):
     from feedxcavator import rpc
 
     try:
-        return rpc.call(method, *args)
+        return rpc.call(method, *args, **kwargs)
     except OSError as e:
         applog.write("warning", f"Telegram runs in the worker process, which is not reachable: {e}")
         return [] if method.endswith("messages") else None
 
 
-def get_channel_messages(channel, limit=MESSAGE_LIMIT):
+def get_channel_messages(channel, limit=MESSAGE_LIMIT, proxy=None):
+    proxy = proxy_name(proxy)
     if in_worker:
-        return _local_get_channel_messages(channel, limit)
-    return _forward("telegram_get_channel_messages", channel, limit)
+        return _local_get_channel_messages(channel, limit, proxy=proxy)
+    return _forward("telegram_get_channel_messages", channel, limit, proxy=proxy)
 
 
-def notify(message, chat_id):
+def notify(message, chat_id, proxy=None):
+    proxy = proxy_name(proxy)
     if in_worker:
-        return _local_notify(message, chat_id)
-    return _forward("telegram_notify", message, chat_id)
+        return _local_notify(message, chat_id, proxy=proxy)
+    return _forward("telegram_notify", message, chat_id, proxy=proxy)
 
 
 def login():
     """TG-6: the interactive login (phone number and code) that creates the session."""
     if not configured():
-        raise SystemExit("Set tg-api-id and tg-api-hash in config.yml first.")
-    client = make_client()
+        raise SystemExit("Set telegram.api-id and telegram.api-hash in config.yml first.")
+    client = make_client(proxy_name())
     client.start()
     me = client.loop.run_until_complete(client.get_me())
     print(f"Logged in as {getattr(me, 'username', None) or getattr(me, 'first_name', '')}. "

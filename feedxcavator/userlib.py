@@ -423,18 +423,20 @@ class _Telegram:
     """telegram.get_channel_messages(channel), telegram.notify(message, chat_id)."""
 
     @staticmethod
-    def get_channel_messages(channel, limit=26):
-        """Headlines for the most recent messages of a public Telegram channel (up to 26)."""
+    def get_channel_messages(channel, limit=26, proxy=None):
+        """Headlines for the most recent messages of a public Telegram channel (up to 26). The call goes
+        through the proxy named by `proxy` (False for a direct connection), otherwise the feed's
+        `fetch.proxy`, otherwise the proxy named `default` when `telegram.default-proxy` is on."""
         from feedxcavator import telegram as tg
 
-        return tg.get_channel_messages(channel, limit)
+        return tg.get_channel_messages(channel, limit, proxy)
 
     @staticmethod
-    def notify(message, chat_id):
-        """Sends a Telegram text message to a chat."""
+    def notify(message, chat_id, proxy=None):
+        """Sends a Telegram text message to a chat. The proxy is chosen as for `get_channel_messages`."""
         from feedxcavator import telegram as tg
 
-        return tg.notify(message, chat_id)
+        return tg.notify(message, chat_id, proxy)
 
 
 telegram = _Telegram()

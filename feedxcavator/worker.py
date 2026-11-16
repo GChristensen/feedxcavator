@@ -44,9 +44,14 @@ class Scheduler:
 
     @staticmethod
     def _next_service():
-        """MNT-2: daily at 04:00 local time."""
+        """MNT-2: daily at `service-task.time` local time (04:00 by default)."""
+        try:
+            hour, minute = conf.service_task_time()
+        except ValueError as e:
+            applog.write("error", f"{e}; using 04:00")
+            hour, minute = 4, 0
         now = datetime.now().astimezone()
-        at = now.replace(hour=4, minute=0, second=0, microsecond=0)
+        at = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
         return at if at > now else at + timedelta(days=1)
 
     def reload(self, registry=None):
@@ -95,7 +100,7 @@ class Scheduler:
                 self._trigger(schedule)
             except Exception:  # noqa: BLE001
                 logger.exception("failed to fire schedule %s", schedule.key)
-        if conf.get("execute-daily-service-task") and now >= self._service_next:
+        if conf.service_task("enabled") and now >= self._service_next:
             self._service_next = self._next_service()
             threading.Thread(target=_service_task, daemon=True, name="service-task").start()
 

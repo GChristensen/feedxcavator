@@ -278,8 +278,9 @@ A fetch uses the proxy named by its `proxy` option, otherwise the one named by `
 feed. `proxy=False` forces a direct connection. A name that is not defined means a direct connection, without
 an error.
 
-The name `default` is not applied to feeds by itself; a feed must name it in `fetch.proxy`. Telegram calls,
-however, always go through the proxy named `default` when one is defined. The `/forward` links made by
+The name `default` is not applied to feeds by itself; a feed must name it in `fetch.proxy`. Telegram calls use
+the `fetch.proxy` of the calling feed too (or their own `proxy` argument); when the feed names none, they go
+through the proxy named `default` only if `telegram.default-proxy` is true. The `/forward` links made by
 `forward_url(url, referer, proxy="name")` fetch through the named proxy. WebSub callbacks never use a proxy.
 
 ### Browsers
@@ -328,8 +329,8 @@ Engine and channel are global; profiles cannot set their own.
 ### Telegram
 
 `telegram.get_channel_messages(channel)` returns headlines for the latest messages of a public Telegram channel,
-and `telegram.notify(message, chat_id)` sends a text message. Both need `tg-api-id` and `tg-api-hash` in
-`config.yml` and a one-time login with `python -m feedxcavator telegram-login`.
+and `telegram.notify(message, chat_id)` sends a text message. Both need `api-id` and `api-hash` under the
+`telegram` key of `config.yml` and a one-time login with `python -m feedxcavator telegram-login`.
 
 ## Selecting elements
 

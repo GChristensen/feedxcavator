@@ -6,7 +6,7 @@ import pytest
 from django.utils import timezone
 
 from conftest import html
-from feedxcavator import maintenance, storage, worker
+from feedxcavator import conf, maintenance, storage, worker
 from feedxcavator.models import Blob, FeedRun, LogEntry, QueueItem, ScheduleState, Settings, TaskRun
 from feedxcavator.runner import TaskRunner
 
@@ -260,6 +260,47 @@ def test_service_task(ws):
     assert storage.fetch_object("kept") == {"a": [1]} and storage.fetch_object("gone", "default") == "default"
     entry = LogEntry.objects.get(source="service-task")
     assert entry.level == "info" and "purged 1 of 1 images" in entry.message  # MNT-1
+
+
+def test_service_task_max_age_setting(ws, monkeypatch):
+    ws({}, startup=True)
+    monkeypatch.setitem(conf.config, "service-task", {"max-age-days": 5})
+    blob = storage.store_blob(b"three days old", "image/png")
+    Blob.objects.filter(id=blob.id).update(created_at=timezone.now() - timedelta(days=3))
+    LogEntry.objects.create(level="info", timestamp=int((time.time() - 3 * 86400) * 1000), message="kept")
+    LogEntry.objects.create(level="info", timestamp=int((time.time() - 6 * 86400) * 1000), message="purged")
+    counts = maintenance.service_task()
+    assert counts["images"] == 0 and counts["log_entries"] == 1
+    assert "older than 5 days" in LogEntry.objects.get(source="service-task").message
+
+
+@pytest.mark.parametrize("value, expected", [("04:00", (4, 0)), ("23:59", (23, 59)), ("7:05", (7, 5)), (240, (4, 0))])
+def test_service_task_time(monkeypatch, value, expected):
+    monkeypatch.setitem(conf.config, "service-task", {"time": value})
+    assert conf.service_task_time() == expected  # an int is an unquoted YAML 1.1 sexagesimal time
+
+
+@pytest.mark.parametrize("value", ["24:00", "4pm", "12:60"])
+def test_service_task_time_invalid(monkeypatch, value):
+    monkeypatch.setitem(conf.config, "service-task", {"time": value})
+    with pytest.raises(ValueError):
+        conf.service_task_time()
+
+
+def test_service_task_schedule_uses_time(monkeypatch):
+    monkeypatch.setitem(conf.config, "service-task", {"time": "13:45"})
+    at = worker.Scheduler._next_service()
+    assert (at.hour, at.minute) == (13, 45) and at > __import__("datetime").datetime.now().astimezone()
+
+
+def test_service_task_enabled(monkeypatch):
+    monkeypatch.setitem(conf.config, "service-task", None)
+    monkeypatch.setitem(conf.config, "execute-daily-service-task", None)
+    assert conf.service_task("enabled") is False and conf.service_task("max-age-days") == 2
+    monkeypatch.setitem(conf.config, "execute-daily-service-task", True)
+    assert conf.service_task("enabled") is True  # the 3.0.0 key
+    monkeypatch.setitem(conf.config, "service-task", {"enabled": False})
+    assert conf.service_task("enabled") is False
 
 
 def test_blobs_share_identical_content():
