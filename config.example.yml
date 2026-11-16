@@ -1,13 +1,20 @@
 # Feedxcavator configuration. Copy to config.yml in the installation directory.
 # Every key is optional; the values below are the defaults unless noted.
 
-port: 10000                      # or FEEDXCAVATOR_PORT
+port: 21000                      # or FEEDXCAVATOR_PORT
 #host: 0.0.0.0                   # or FEEDXCAVATOR_HOST
 
-# Base URLs used in generated links
-hostname: 'http://feeds:10000'            # when no request is in progress
-websub-hostname: 'http://feeds:10000'     # feed URLs and the hub URL
-secure-hostname: 'https://feeds:11000'    # forward links requested with https
+# The public address of this server (scheme://host[:port], no trailing slash), as readers reach it.
+# hostname: the base of links the server writes into feed items: stored images (/image/...) and the links
+#   made in feed code by redirect_url, redirect_url_b64, forward_url and forward_url_b64. During a request
+#   the request's own address is used instead, so this matters for feeds updated by tasks in the background.
+#   An https:// value also marks the login and CSRF cookies secure.
+# websub-hostname: the base of feed URLs and of the WebSub hub URL (defaults to hostname).
+# secure-hostname: the base of /forward links made in feed code with forward_url(..., https=True) or
+#   forward_url_b64(..., https=True) (defaults to hostname). Without https=True they use hostname.
+hostname: 'http://feeds:21000'
+websub-hostname: 'http://feeds:21000'
+secure-hostname: 'https://feeds:22000'
 
 authentication: true             # false disables the login requirement
 user: user                       # set the password with: feedxcavator set-password

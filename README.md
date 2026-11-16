@@ -625,12 +625,35 @@ in the console (feed context menu or toolbar): it rewrites the suffix in `feed.y
 any change of suffix or directory, and it is also served at `/feed/uuid:<id>`. The server never writes ids into
 `feed.yaml` itself.
 
-## Using with NewsBlur
+## Hostnames: a reader on the same machine
 
-Feedxcavator works with [NewsBlurMod](https://github.com/GChristensen/NewsBlurMod). The original NewsBlur
-throttles incoming WebSub push requests, so it cannot receive real-time updates smoothly. Because NewsBlur(Mod)
-runs inside Docker, Feedxcavator should either also run in a container or be reached by a domain name other than
-localhost when both are on the same machine. See the Docker documentation for details.
+The server is reached from two directions: browsers follow the links written into feed items, and a WebSub
+subscriber talks to the hub and is pushed updates. When the reader runs on the same machine and the machine's LAN
+name resolves to itself there, one address serves both.
+
+Example: Feedxcavator and NewsSharp, a web feed reader, run on a machine called `lab`. People read news in a
+browser on other computers of the LAN. NewsSharp subscribes to Feedxcavator over WebSub.
+
+```yaml
+port: 21000
+host: 0.0.0.0                     # listen on the LAN too, not only on 127.0.0.1
+hostname: 'http://lab:21000'      # websub-hostname and secure-hostname default to it
+#secure-hostname: 'https://lab:22000'   # only with an HTTPS reverse proxy, see HTTPS above
+```
+
+- `hostname` is the base of image, redirect and forward links in feed items, of each feed's `self` link and of its
+  `hub` link (`http://lab:21000/websub`). Browsers on the LAN and NewsSharp on `lab` can all open it.
+- In NewsSharp, add feeds by the same address, for example `http://lab:21000/feed/city-paper`, so the
+  subscription URL equals the feed's `self` link. Feeds without `tasks`, which are extracted when NewsSharp polls
+  them, then also get `lab` links: during a request the server writes links with the address the request came to.
+- NewsSharp chooses the callback URL and sends it with the subscription. Feedxcavator opens it from `lab` to verify
+  the subscription and to push updates, so it may use `localhost` or `lab`. If the callback cannot be opened, the
+  subscription is not verified and the log shows "WebSub verification failed".
+
+Check that the name resolves on the server itself (`ping lab` there). If it does not, add `127.0.0.1 lab` to the
+hosts file, or keep `hostname` at `lab` and set `websub-hostname: 'http://localhost:21000'`. With the second
+option, subscribe at the `localhost` URL. A feed without tasks that NewsSharp polls at `localhost` then gets
+`localhost` image links, which do not open on other computers.
 
 ## Development
 

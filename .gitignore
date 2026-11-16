@@ -9,6 +9,7 @@ __pycache__/
 /log/
 /workspace/
 /config.yml
+/.env
 node_modules/
 .pytest_cache/
 *.tmp

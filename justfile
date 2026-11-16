@@ -5,8 +5,12 @@
 #   just deploy                         copy the code to the server
 #   just pull-data                      replace local data/, workspace/ and config.yml with the server's
 #   just remote='\\host\share\dir' deploy   use another installation directory
+#
+# FEEDXCAVATOR_REMOTE can also be set in a .env file next to this justfile (not committed).
+# Single-quote the value so the backslashes stay literal: FEEDXCAVATOR_REMOTE='\\host\share\dir'
 
 set windows-shell := ["powershell.exe", "-NoLogo", "-NoProfile", "-Command"]
+set dotenv-load
 
 # The installation directory on the server (holds feedxcavator/, data/, workspace/, config.yml).
 remote := env("FEEDXCAVATOR_REMOTE", '\\server\share\feedxcavator')
