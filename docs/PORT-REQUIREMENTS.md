@@ -292,6 +292,7 @@ FD2-5. Top-level fields:
 | `filter`     | list                 | none     | FD2-10.                                                                         |
 | `fulltext`   | boolean or map       | false    | Section 10.                                                                     |
 | `transform`  | string               | none     | Name of a function applied to each headline after extraction and before filtering. |
+| `post_process` | string             | none     | Name of a function applied to the whole list of headlines after `transform` and before filtering; returns a new list or None to keep it. `post-process` is accepted. |
 | `output`     | string or map        | `rss`    | `rss`, `atom`, `json-feed`, `json`. Map form: `{format, limit}`.                |
 | `tasks`      | list of strings      | none     | Tasks this feed belongs to (replaces the single `task`).                        |
 | `parallel`   | boolean              | true     | As before (TSK-6).                                                              |

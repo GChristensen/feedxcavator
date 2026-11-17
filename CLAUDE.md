@@ -44,8 +44,8 @@ Both processes load the workspace independently (`workspace.py`) and reload when
 ### Request and extraction flow
 
 `views.feed` → `extraction.run_feed(feed, mode)` with mode `request`, `background` or `test`.
-`run_feed` calls the feed's extractor or `default_feed_parser`, then `post_process` (transform, filter steps,
-full text, limit), then `output.produce_feed_output`. Background mode stores the output and publishes to WebSub.
+`run_feed` calls the feed's extractor or `default_feed_parser`, then `finish_headlines` (transform,
+post_process, filter steps, full text, limit), then `output.produce_feed_output`. Background mode stores the output and publishes to WebSub.
 A feed with `tasks` is always served from stored output.
 
 ### Workspace loading (`workspace.py`)

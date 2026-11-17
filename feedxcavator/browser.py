@@ -78,8 +78,9 @@ class _Session:
     """One browser with a persistent profile, driven on its own thread (the Playwright sync API is
     bound to the thread that created it)."""
 
-    def __init__(self, profile: str):
+    def __init__(self, profile: str, proxy: dict | None = None):
         self.profile = storage.sanitize_path(profile or "default").replace("/", "_").replace("\\", "_")
+        self.proxy = proxy  # a resolved proxy definition (fetch.resolve_proxy), applied at launch
         self._commands: queue.Queue = queue.Queue()
         self._pages: dict[int, object] = {}
         self._challenged: dict[int, bool] = {}  # pages whose last navigation Cloudflare answered with a challenge
@@ -110,7 +111,8 @@ class _Session:
 
             from feedxcavator import camoufox_identity
 
-            manager, self._context = camoufox_identity.start(profile_dir, headless)
+            extra = {"proxy": playwright_proxy(self.proxy)} if self.proxy else {}
+            manager, self._context = camoufox_identity.start(profile_dir, headless, **extra)
             self._closers.append(lambda: manager.__exit__(None, None, None))
             return
         if engine == "playwright":
@@ -121,6 +123,8 @@ class _Session:
         self._closers.append(playwright.stop)
         channel = conf.get("browser-channel", "chrome")
         options = {"user_data_dir": str(profile_dir), "headless": headless, "no_viewport": True}
+        if self.proxy:
+            options["proxy"] = playwright_proxy(self.proxy)
         try:
             self._context = playwright.chromium.launch_persistent_context(channel=channel, **options)
         except Exception as e:  # noqa: BLE001 - the channel browser is not installed: use the bundled one
@@ -277,7 +281,16 @@ class _Session:
         if len([p for p in self._context.pages if not p.is_closed()]) > 1:
             page.close()
         else:  # the last page: keep its window for the next open
-            page.goto("about:blank")
+            for _ in range(2):  # a page navigating by itself (a Cloudflare check reloading) interrupts the goto
+                try:
+                    page.goto("about:blank")
+                    return
+                except Exception:  # noqa: BLE001
+                    page.wait_for_timeout(500)
+            try:
+                page.close()
+            except Exception:  # noqa: BLE001, S110
+                pass
 
     def _op_cookies(self, url=None):
         cookies = self._context.cookies(url) if url else self._context.cookies()
@@ -286,6 +299,16 @@ class _Session:
     def _op_user_agent(self):
         page = next(iter(self._pages.values()), None) or self._free_page()
         return page.evaluate("navigator.userAgent")
+
+
+def playwright_proxy(proxy: dict) -> dict:
+    """A proxy definition (fetch.resolve_proxy) as the `proxy` launch option of Playwright and Camoufox."""
+    scheme = proxy.get("scheme") or proxy.get("type") or "http"
+    result = {"server": f"{scheme}://{proxy['host']}:{proxy['port']}"}
+    if proxy.get("user"):
+        result["username"] = str(proxy["user"])
+        result["password"] = str(proxy.get("password") or "")
+    return result
 
 
 class BrowserPool:
@@ -297,14 +320,14 @@ class BrowserPool:
         self._profiles: dict[str, threading.Lock] = {}
         self._lock = threading.Lock()
 
-    def acquire(self, profile: str = "default") -> _Session:
+    def acquire(self, profile: str = "default", proxy: dict | None = None) -> _Session:
         with self._lock:
             profile_lock = self._profiles.setdefault(profile, threading.Lock())
         self._slots.acquire()
         profile_lock.acquire()  # a profile directory can be used by one browser at a time
         try:
             ensure_display()
-            session = _Session(profile)
+            session = _Session(profile, proxy)
         except BaseException:
             profile_lock.release()
             self._slots.release()
@@ -446,9 +469,9 @@ class Browser:
 
 
 class _LocalTransport:
-    def __init__(self, pool: BrowserPool, profile: str):
+    def __init__(self, pool: BrowserPool, profile: str, proxy: dict | None = None):
         self._pool = pool
-        self._session = pool.acquire(profile)
+        self._session = pool.acquire(profile, proxy)
 
     def call(self, op, *args, **kwargs):
         return self._session.call(op, *args, **kwargs)
@@ -458,11 +481,11 @@ class _LocalTransport:
 
 
 class _RemoteTransport:
-    def __init__(self, profile: str):
+    def __init__(self, profile: str, proxy: dict | None = None):
         from feedxcavator import rpc
 
         self._connection = rpc.connect()
-        self._request("browser_open", profile)
+        self._request("browser_open", profile, proxy)
 
     def _request(self, method, *args, **kwargs):
         self._connection.send((method, args, kwargs))
@@ -482,19 +505,28 @@ class _RemoteTransport:
 
 
 class browser:
-    """with browser(profile="default") as b: ..."""
+    """with browser(profile="default", proxy=None) as b: ...
 
-    def __init__(self, profile="default", **options):
+    `proxy` names a proxy (defproxy, or `proxies` in config.yml) the browser connects through. The browser is
+    launched for each `with`, so the proxy holds for that session only; the profile keeps its cookies."""
+
+    def __init__(self, profile="default", proxy=None, **options):
         self._profile = str(getattr(options.get("profile"), "name", None) or profile or "default")
+        self._proxy_name = proxy
         self._transport = None
 
     def __enter__(self) -> Browser:
         context.check_cancelled()
+        proxy = None
+        if self._proxy_name:
+            proxy = fetch.resolve_proxy(self._proxy_name)
+            if proxy is None:
+                raise BrowserError(f"browser: proxy '{self._proxy_name}' is not defined")
         if _pool is not None:
-            self._transport = _LocalTransport(_pool, self._profile)
+            self._transport = _LocalTransport(_pool, self._profile, proxy)
         else:
             try:
-                self._transport = _RemoteTransport(self._profile)
+                self._transport = _RemoteTransport(self._profile, proxy)
             except (OSError, EOFError) as e:
                 raise BrowserError(
                     f"the browser runs in the worker process, which is not reachable: {e}") from None

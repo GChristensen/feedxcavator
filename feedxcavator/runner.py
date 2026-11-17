@@ -195,6 +195,14 @@ class TaskRunner:
         if call_future is not None and call_future.done() and not call_future.cancelled():
             call_error = call_future.exception()
 
+        with context.scope(source=task.name, task_run=run.id):
+            if timed_out:
+                late = sorted(futures[f].get("suffix") or futures[f]["key"] for f in not_done if f in futures)
+                applog.write("warning", f"task {task.name} timed out"
+                                        + (f"; feeds not finished: {', '.join(late)}" if late else ""))
+            if call_error is not None:
+                applog.write("error", f"call of task {task.name} failed: {type(call_error).__name__}: {call_error}")
+
         # results of this run and of its subtasks, for post
         run_ids = [run.id] + self._descendant_ids(run.id)
         records = list(FeedRun.objects.filter(task_run_id__in=run_ids).order_by("id"))
@@ -282,6 +290,8 @@ class TaskRunner:
                     if result.error:
                         status, error = "error", result.error
                         applog.write("error", f"{feed.get('suffix')}: {result.error}")
+                    elif not count and not feed.get("expect_empty"):  # TSK-9, TSK2-8: same rule as the Runs tab
+                        applog.write("warning", f"{feed.get('suffix')}: zero headlines")
                 except context.JobCancelled:
                     status, error = "timeout", "the task run timed out"
                 except Exception as e:  # noqa: BLE001 - must not affect other jobs

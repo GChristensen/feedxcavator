@@ -443,22 +443,25 @@ class _Telegram:
 telegram = _Telegram()
 
 
-def browser(profile="default"):
-    """with browser(profile="default") as b: opens a stealth browser from the worker's pool.
+def browser(profile="default", proxy=None):
+    """with browser(profile="default", proxy=None) as b: opens a stealth browser from the worker's pool,
+    connecting through the proxy named by `proxy` when given ((with-browser [b :proxy "default"]) in Hy).
     b.open(url, wait_for=None, scroll=0) returns a page with html(), apply_selectors(feed), click(),
     fill(), wait_for(selector, timeout, required=True) (False on a timeout when not required), evaluate(script, arg), screenshot(selector), solve_captcha(), text(), url and
     cookies()."""
     from feedxcavator import browser as _browser
 
-    return _browser.browser(profile)
+    return _browser.browser(profile, proxy)
 
 
-def solve_captcha(url, profile="default", timeout=60, watch=10):
-    """(solve-captcha url :profile "default"): opens `url` in a pool browser and passes a Cloudflare challenge
-    there with the system mouse, so later visits with the profile (and fetch_url calls to the host) get through.
+def solve_captcha(url, profile="default", timeout=60, watch=10, proxy=None):
+    """(solve-captcha url :profile "default" :proxy None): opens `url` in a pool browser and passes a Cloudflare
+    challenge there with the system mouse, so later visits with the profile (and fetch_url calls to the host) get
+    through. Clearance is bound to the address the challenge came from: solve it through the proxy the site is
+    crawled through.
     A challenge may show up some time after the page opens: `watch` is how long to wait for one. True when the
     page is through. In an open browser, page.solve_captcha(watch=...) does the same on that page."""
-    with browser(profile) as b:
+    with browser(profile, proxy) as b:
         page = b.open(url, timeout=timeout)
         try:
             return page.solve_captcha(timeout, watch=watch)

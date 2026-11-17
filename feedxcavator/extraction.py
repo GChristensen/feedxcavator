@@ -213,17 +213,18 @@ def apply_fulltext(feed, headlines):
     return headlines
 
 
-def _resolve_function(name: str):
+def _resolve_function(name: str, kind: str = "transform"):
     from feedxcavator import workspace
 
     registry = workspace.get_registry()
     fn = registry.namespace.get(name) or registry.namespace.get(name.replace("-", "_"))
     if not callable(fn):
-        raise LookupError(f"transform function '{name}' is not defined")
+        raise LookupError(f"{kind} function '{name}' is not defined")
     return fn
 
 
-def post_process(feed, headlines, testing: bool):
+def finish_headlines(feed, headlines, testing: bool):
+    """Everything after extraction: `transform`, `post_process`, the filter steps, full text and the limit."""
     headlines = [h for h in (headlines or []) if h]
     if feed.get("transform"):
         fn = _resolve_function(feed["transform"])
@@ -234,6 +235,11 @@ def post_process(feed, headlines, testing: bool):
                 continue
             transformed.append(headline if result is None else result)
         headlines = transformed
+    if feed.get("post_process"):
+        fn = _resolve_function(feed["post_process"], "post_process")
+        result = fn(headlines)
+        if result is not None:
+            headlines = [h for h in result if h]
     headlines = filters.filter_headlines(feed, headlines, testing=testing)
     headlines = apply_fulltext(feed, headlines)
     limit = (feed.get("output") or {}).get("limit") if isinstance(feed.get("output"), dict) else None
@@ -298,7 +304,7 @@ def run_feed(feed, mode: str, registry=None) -> Result:
                 return Result(error=error[0]["summary"], http_status=http_status)
             return Result(output=output.produce_feed_output(feed, error), headlines=[],
                           error=error[0]["summary"], http_status=http_status)
-        headlines = post_process(feed, list(raw or []), testing=(mode == "test"))
+        headlines = finish_headlines(feed, list(raw or []), testing=(mode == "test"))
         if mode == "test":
             return Result(output=output.produce_feed_output(feed, headlines), headlines=headlines)
         if not headlines:

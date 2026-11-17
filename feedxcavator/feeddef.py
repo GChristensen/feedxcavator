@@ -67,6 +67,7 @@ source: https://example.com
 #  - limit: 50
 #fulltext: false
 #transform: function-name
+#post_process: function-name
 #output: rss                # rss, atom, json-feed, json
 #tasks: [task-name]
 #parallel: true
@@ -285,6 +286,9 @@ class FeedDefinition(BaseModel):
     filter: list[FilterStep] | None = None
     fulltext: FullText | None = None
     transform: str | None = None
+    post_process: str | None = Field(None, description=(
+        "Name of a function that receives the whole list of headlines after `transform` and before the filter "
+        "steps, and returns a new list, or None to keep it"))
     output: Output = Output()
     tasks: list[str] = []
     parallel: bool = True
@@ -335,6 +339,8 @@ def json_schema() -> dict:
 def normalize(raw: dict) -> dict:
     """Rewrites the 3.0.0 spellings into the current fields (FD2-5, FD2-10)."""
     data = dict(raw)
+    if "post-process" in data and "post_process" not in data:
+        data["post_process"] = data.pop("post-process")
     if "task" in data:
         task = data.pop("task")
         if task and not data.get("tasks"):

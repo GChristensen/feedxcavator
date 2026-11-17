@@ -112,11 +112,12 @@ filter:                        # applied in this order
   - limit: 50
 fulltext: false                # true: fetch each linked page and use its main text as the summary
 transform: function-name       # a function applied to every headline
+post_process: function-name    # a function applied to the whole list of headlines
 output: rss                    # rss, atom, json-feed or json
 tasks: [task-name]             # extract in the background (see "Extracting feeds in the background")
 parallel: true                 # false: run on the sequential worker pool
 websub: {enabled: true, partition: 100}  # push updates, by parts of 100 items
-expect_empty: false            # true: zero headlines is normal, no profiling warning or highlight in run history
+expect_empty: false            # true: zero headlines is normal, no zero-headline log warning or highlight in run history
 extractor: extractor-name      # the code that produces the headlines instead of the selectors
 params: [any additional data, [123, 456]]  # arbitrary data for the code
 ```
@@ -233,6 +234,20 @@ and returns a changed copy, None to keep it as it is, or False to drop it:
 ```python
 def shout(headline):
     return {**headline, "title": headline["title"].upper()}
+```
+
+To change the whole list without writing an extractor, name a function in `post_process` (`post-process` is
+accepted too). It receives the list of headlines after `transform` and before the filter steps, and returns a new
+list, or None to keep the list as it is. The sorting extractor above can be written this way, and the feed keeps
+the error headline that the built-in extractor produces when the source cannot be read:
+
+```python
+def by_title(headlines):
+    return sorted(headlines, key=lambda h: h["title"])
+```
+
+```yaml
+post_process: by-title
 ```
 
 ## Fetching web resources

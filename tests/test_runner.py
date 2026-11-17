@@ -59,6 +59,10 @@ def post_slow(ctx):
 def job():
     EVENTS.append(("call",))
 
+@task_function("job-fail")
+def job_fail():
+    raise KeyError("nope")
+
 @extractor("slow")
 def slow(feed):
     GATE.wait(10)
@@ -107,6 +111,9 @@ def test_task_run_order_and_records(http, ws, runner):
     assert storage.fetch_feed_output(registry.feeds["empty"].key) is None
 
     assert LogEntry.objects.filter(source="boom", level="error").count() == 1  # the logging source
+    zero = list(LogEntry.objects.filter(level="warning", message__contains="zero headlines")
+                .values_list("message", flat=True))
+    assert zero == ["empty: zero headlines"]  # TSK2-8: not for expect_empty or failed feeds
 
 
 def test_pre_and_post_outcomes(http, ws, runner):
@@ -137,6 +144,14 @@ def test_pre_and_post_outcomes(http, ws, runner):
     assert ("call",) not in events
 
 
+def test_call_failure_is_logged(ws, runner):
+    ws({"lib/fns.py": LIB, "tasks.yaml": "tasks:\n  broken: {call: job-fail}\n"}, startup=True)
+    run = runner.run("broken")
+    assert run.status == "failed" and "nope" in run.error
+    entry = LogEntry.objects.get(source="broken", level="error")
+    assert entry.message.startswith("call of task broken failed: KeyError")
+
+
 def test_timeout_cancels_jobs_and_post_still_runs(http, ws, runner):
     http.routes["/a"] = html(PAGE.format(n=1))
     registry = ws({
@@ -153,6 +168,8 @@ def test_timeout_cancels_jobs_and_post_still_runs(http, ws, runner):
     assert statuses == {"slow": "timeout", "fast": "ok"}  # TSK2-7
     post = next(e for e in registry.namespace["EVENTS"] if e[0] == "post")
     assert ("slow", "timeout", None) in post[2] and ("fast", "ok", 1) in post[2]  # TSK2-6b
+    warning = LogEntry.objects.get(source="t", level="warning")
+    assert warning.message == "task t timed out; feeds not finished: slow"
     registry.namespace["GATE"].set()  # the late job must neither store output nor change its record
     time.sleep(0.5)
     assert storage.fetch_feed_output(registry.feeds["slow"].key) is None

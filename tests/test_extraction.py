@@ -245,6 +245,34 @@ def test_fulltext_and_transform(http, ws):
     assert "content" not in limited.headlines[0]
 
 
+def test_post_process(http, ws):
+    http.routes["/list"] = page([1, 2, 3])
+    ws({"lib/p.py": "def tag(h):\n    return {**h, 'title': '[x] ' + h['title']}\n"
+                    "def backwards(hs):\n    assert all(h['title'].startswith('[x] ') for h in hs)\n"
+                    "    return list(reversed(hs)) + [None]\n"
+                    "def keep(hs):\n    hs.append({'title': 'extra'})\n    return None\n"}, startup=True)
+    # runs after transform and before the filter steps; falsy items in the result are dropped
+    feed = make_feed(http.url + "/list", "transform: tag\npost_process: backwards\nfilter:\n  - limit: 2\n")
+    assert feed["post_process"] == "backwards"
+    titles = [h["title"] for h in extraction.run_feed(feed, "test").headlines]
+    assert titles == ["[x] Title 3", "[x] Title 2"]
+    # the hyphenated spelling is accepted; None keeps the (here mutated) list
+    feed = make_feed(http.url + "/list", "post-process: keep\n")
+    assert feed["post_process"] == "keep"
+    assert [h["title"] for h in extraction.run_feed(feed, "test").headlines][-1] == "extra"
+    # the built-in extractor's error headline survives (EX-3)
+    http.routes["/gone"] = (404, {}, "")
+    error = extraction.run_feed(make_feed(http.url + "/gone", "post_process: backwards\n"), "request")
+    assert error.error.startswith("HTTP error")
+    missing = make_feed(http.url + "/list", "post_process: nowhere\n")
+    try:
+        extraction.run_feed(missing, "test")
+    except LookupError as e:
+        assert "post_process function 'nowhere'" in str(e)
+    else:
+        raise AssertionError("a missing post_process function must fail")
+
+
 def test_auto_mode(http):
     rss = ('<?xml version="1.0"?><rss version="2.0"><channel><title>t</title>'
            '<item><title>From feed</title><link>/f/1</link><description>d</description>'

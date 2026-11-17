@@ -74,3 +74,28 @@ def test_open_frees_the_page_when_navigation_fails():
         session._op_open("https://example.com/")
     assert session._pages == {}
     assert page.closed
+
+
+def test_close_page_survives_an_interrupted_goto():
+    page = _StubPage(goto_fails=True)
+    session = _session(page)
+    session._pages[1] = page
+    session._op_close_page(1)
+    assert session._pages == {}
+    assert page.closed
+
+
+def test_playwright_proxy():
+    assert browser.playwright_proxy({"host": "p.test", "port": 3128}) == {"server": "http://p.test:3128"}
+    assert browser.playwright_proxy({"host": "p.test", "port": 1080, "scheme": "socks5", "user": "u",
+                                     "password": "p"}) == {"server": "socks5://p.test:1080", "username": "u",
+                                                           "password": "p"}
+
+
+def test_browser_with_an_undefined_proxy_raises(monkeypatch):
+    from feedxcavator import fetch
+
+    monkeypatch.setattr(fetch, "proxy_resolver", {}.get)
+    with pytest.raises(browser.BrowserError, match="not defined"):
+        with browser.browser(proxy="missing"):
+            pass
