@@ -3,6 +3,7 @@
 #   just run [--dev]                    start the server in a new cmd window
 #   just build                          clean install of the frontend packages and a console build
 #   just build-demo                     build the static demo into demo/ (GitHub Pages, opens from disk too)
+#   just build-landing [--plain] [--out dir]   build the landing page into the root index.html (GitHub Pages)
 #   just demo-server                    start a server on demo/home for recording, in a new cmd window
 #   just record-demo [args]             record the demo fixtures from that server, then build the demo
 #   just lock                           update uv.lock and constraints.txt after a dependency change
@@ -42,6 +43,13 @@ build:
 [working-directory('frontend')]
 build-demo:
     npm run build:demo
+
+# Arguments go to landing/build.mjs: --plain for a readable, unminified page, --out <dir> to preview elsewhere.
+# Build landing/ into the repo-root index.html and media/landing/ (GitHub Pages); installs its packages on first use.
+[working-directory('landing')]
+build-landing *args:
+    if (-not (Test-Path node_modules)) { npm ci; if ($LASTEXITCODE) { exit 1 } }
+    node build.mjs {{args}}
 
 # The home demo/home is not in git; its config.yml is written on first use. It serves demo/workspace.
 # Start a server on demo/home (port 21900) for recording the demo, in a new cmd window.

@@ -17,6 +17,7 @@ a delta over `REQUIREMENTS.md` in the same folder. Code comments cite requiremen
 .venv\Scripts\python -m pytest tests/test_web.py -k handlers
 cd frontend && npm run build                          # rebuilds feedxcavator/static/console (committed)
 just build-demo                                       # rebuilds the static demo in demo/ (committed, GitHub Pages)
+just build-landing                                    # rebuilds the landing page (landing/) into the root index.html
 just demo-server; just record-demo                    # records the demo fixtures from demo/home, then rebuilds
 .venv\Scripts\python -m feedxcavator run              # supervisor: web + worker
 .venv\Scripts\python -m feedxcavator manage makemigrations feedxcavator
