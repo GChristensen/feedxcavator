@@ -242,6 +242,15 @@ def test_authentication(ws, client):
         conf.config["authentication"] = False
 
 
+def test_tree_lists_group_lib_first(ws):
+    ws({"lib/util.py": "", "feeds/a/a.py": "", "feeds/news/aaa/feed.yaml": "title: a\n",
+        "feeds/news/lib/util.py": "", "feeds/news/zzz.py": ""}, startup=True)
+    tree = Client().get(f"{API}/tree").json()["tree"]
+    assert [n["name"] for n in tree if n["name"] in ("feeds", "lib")] == ["feeds", "lib"]  # top level unchanged
+    news = next(n for n in next(n for n in tree if n["name"] == "feeds")["children"] if n["name"] == "news")
+    assert [c["name"] for c in news["children"]] == ["lib", "aaa", "zzz.py"]
+
+
 def test_csrf_protects_console_api(ws):
     ws({}, startup=True)
     strict = Client(enforce_csrf_checks=True)
@@ -338,7 +347,7 @@ def test_console_api_tasks_schedules_and_misc(ws, client):
     assert QueueItem.objects.count() == 2
 
     rows = client.get(f"{API}/schedules").json()["schedules"]
-    assert rows[0]["task"] == "news" and len(rows[0]["next"]) == 5 and "12:00" in rows[0]["description"]  # UI2-8
+    assert rows[0]["task"] == "news" and len(rows[0]["next"]) == 1 and "12:00" in rows[0]["description"]  # UI2-8
     assert post(client, "/schedules/save", {"index": 0, "cron": "30 8 * * mon", "enabled": False}).status_code == 200
     assert post(client, "/schedules/save", {"task": "morning", "cron": "0 6 15 * *",
                                             "timezone": "Europe/Kyiv"}).status_code == 200
@@ -380,6 +389,24 @@ def test_console_api_tasks_schedules_and_misc(ws, client):
     assert client.get(f"{API}/settings").json()["subscription_url"] == "https://reader.test/?url="
     assert post(client, "/restart").status_code == 409  # LFC-2
     assert client.get(f"{API}/runs").json() == []
+
+
+def test_clear_runs_keeps_runs_in_progress(ws, client):
+    from django.utils import timezone
+
+    from feedxcavator.models import FeedRun, TaskRun
+
+    ws({}, startup=True)
+    now = timezone.now()
+    done = TaskRun.objects.create(task="a", trigger="manual", started_at=now, finished_at=now, status="ok")
+    TaskRun.objects.create(task="sub", trigger="subtask", parent=done, started_at=now, status="ok")
+    FeedRun.objects.create(task_run=done, feed_id="f", started_at=now, status="ok")
+    running = TaskRun.objects.create(task="b", trigger="manual", started_at=now, status="running")
+
+    response = client.delete(f"{API}/runs")
+    assert response.status_code == 200 and response.json() == {"deleted": 1}
+    assert [r["id"] for r in client.get(f"{API}/runs").json()] == [running.id]
+    assert TaskRun.objects.count() == 1 and FeedRun.objects.count() == 0
 
 
 def test_backup_and_restore(ws, client):

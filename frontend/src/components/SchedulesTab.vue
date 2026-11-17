@@ -1,7 +1,8 @@
 <script setup>
 // The Schedules tab (UI2-8): edits go to schedules.yaml, preserving its comments.
-import { inject, onMounted, reactive, ref, watch } from 'vue'
+import { computed, inject, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import { api, describeError } from '../api'
+import { formatTime } from '../time'
 
 const props = defineProps({ active: Boolean })
 const store = inject('store')
@@ -12,7 +13,27 @@ const tasks = ref([])
 const message = ref('')
 const failed = ref(false)
 const edits = reactive({}) // index -> { cron, timezone }
-const adding = reactive({ task: '', cron: '0 12 * * *', timezone: '', misfire: 'skip' })
+const NEW_SCHEDULE = { task: '', cron: '0 12 * * *', timezone: '', misfire: 'skip' }
+const adding = reactive({ ...NEW_SCHEDULE })
+const addingOpen = ref(false)
+const addingTask = ref(null) // the task input of the new-schedule row
+const filter = ref('')
+
+const shown = computed(() => {
+  const needle = filter.value.trim().toLowerCase()
+  return needle ? rows.value.filter((r) => r.task.toLowerCase().includes(needle)) : rows.value
+})
+
+async function openAdding() {
+  addingOpen.value = true
+  await nextTick()
+  if (addingTask.value) addingTask.value.focus()
+}
+
+function closeAdding() {
+  addingOpen.value = false
+  Object.assign(adding, NEW_SCHEDULE)
+}
 
 function say(text, isError = false) {
   message.value = text
@@ -59,7 +80,7 @@ async function add() {
   try {
     const result = await api.post('/schedules/save', body)
     store.setLoad(result.load)
-    adding.task = ''
+    closeAdding()
     say('Schedule added.')
     await refresh()
   } catch (error) {
@@ -90,7 +111,7 @@ async function runNow(row) {
 }
 
 function time(iso) {
-  return iso ? new Date(iso).toLocaleString() : ''
+  return iso ? formatTime(iso) : ''
 }
 
 onMounted(refresh)
@@ -100,8 +121,10 @@ watch(() => props.active, (active) => active && refresh())
 <template>
   <div class="tab-pane">
     <div class="toolbar">
+      <button class="primary" :disabled="addingOpen" @click="openAdding">Add schedule</button>
       <button @click="refresh">Refresh</button>
       <button @click="store.openFile('schedules.yaml')">Edit schedules.yaml</button>
+      <input v-model="filter" type="search" placeholder="Filter by task" size="18" />
       <span class="hint" :class="{ 'error-text': failed }">{{ message }}</span>
     </div>
     <div v-if="errors.length" class="tab-pane padded error-text" style="flex: none; height: auto">
@@ -111,12 +134,36 @@ watch(() => props.active, (active) => active && refresh())
       <table class="grid">
         <thead>
           <tr>
-            <th>On</th><th>Task</th><th>Cron</th><th>Time zone</th><th>Missed firing</th><th>Next firings</th>
+            <th>On</th><th>Task</th><th>Cron</th><th>Time zone</th><th>Missed firing</th><th>Next firing</th>
             <th>Last firing</th><th>Last run</th><th></th>
           </tr>
         </thead>
         <tbody>
-          <tr v-for="row in rows" :key="row.index">
+          <tr v-if="addingOpen" class="new-schedule" @keyup.enter="$event.target.tagName === 'INPUT' && add()"
+              @keyup.esc="closeAdding">
+            <td></td>
+            <td>
+              <input ref="addingTask" v-model="adding.task" type="text" list="task-names" placeholder="task" size="16" />
+              <datalist id="task-names"><option v-for="t in tasks" :key="t" :value="t" /></datalist>
+            </td>
+            <td><input v-model="adding.cron" type="text" class="mono" size="16" placeholder="0 12 * * *" /></td>
+            <td><input v-model="adding.timezone" type="text" size="16" placeholder="local" /></td>
+            <td>
+              <select v-model="adding.misfire">
+                <option value="skip">skip</option>
+                <option value="run-once">run once</option>
+              </select>
+            </td>
+            <td colspan="3" class="muted">minute hour day-of-month month day-of-week</td>
+            <td class="nowrap">
+              <button class="small primary" @click="add">Save</button>
+              <button class="small" @click="closeAdding">Cancel</button>
+            </td>
+          </tr>
+          <tr v-if="rows.length && !shown.length">
+            <td colspan="9" class="muted">No schedules match the filter.</td>
+          </tr>
+          <tr v-for="row in shown" :key="row.index">
             <td><input type="checkbox" :checked="row.enabled" title="Enabled"
                        @change="change(row, { enabled: $event.target.checked })" /></td>
             <td class="mono">{{ row.task }}</td>
@@ -145,23 +192,6 @@ watch(() => props.active, (active) => active && refresh())
               <button class="small" @click="runNow(row)">Run now</button>
               <button class="small danger" @click="remove(row)">Delete</button>
             </td>
-          </tr>
-          <tr>
-            <td></td>
-            <td>
-              <input v-model="adding.task" type="text" list="task-names" placeholder="task" size="16" />
-              <datalist id="task-names"><option v-for="t in tasks" :key="t" :value="t" /></datalist>
-            </td>
-            <td><input v-model="adding.cron" type="text" class="mono" size="16" placeholder="0 12 * * *" /></td>
-            <td><input v-model="adding.timezone" type="text" size="16" placeholder="local" /></td>
-            <td>
-              <select v-model="adding.misfire">
-                <option value="skip">skip</option>
-                <option value="run-once">run once</option>
-              </select>
-            </td>
-            <td colspan="3" class="muted">minute hour day-of-month month day-of-week</td>
-            <td><button class="small primary" @click="add">Add</button></td>
           </tr>
         </tbody>
       </table>

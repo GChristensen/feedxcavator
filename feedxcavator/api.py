@@ -106,7 +106,10 @@ def reload() -> dict:
 def _tree(directory: Path, feeds: dict) -> list[dict]:
     nodes = []
     try:
-        entries = sorted(directory.iterdir(), key=lambda p: (p.is_file(), p.name.lower()))
+        # a group library (WS2-9) is listed first in its folder; the top-level lib/ keeps its place
+        nested = directory != root()
+        entries = sorted(directory.iterdir(),
+                         key=lambda p: (not (nested and p.name == "lib" and p.is_dir()), p.is_file(), p.name.lower()))
     except OSError:
         return nodes
     for entry in entries:
@@ -717,9 +720,11 @@ class ScheduleIn(Schema):
 
 def _describe(cron: str) -> str:
     try:
-        from cron_descriptor import get_description
+        from cron_descriptor import Options, get_description
 
-        return get_description(cron)
+        options = Options()
+        options.use_24hour_time_format = True
+        return get_description(cron, options)
     except Exception:  # noqa: BLE001
         return ""
 
@@ -741,7 +746,7 @@ def list_schedules(request):
             "description": _describe(schedule.cron),
             "timezone": schedule.timezone, "effective_timezone": str(schedule.tzinfo()),
             "misfire": schedule.misfire, "enabled": schedule.enabled, "jitter": schedule.jitter,
-            "next": [d.isoformat() for d in schedule.next_fires(5)] if schedule.enabled else [],
+            "next": [d.isoformat() for d in schedule.next_fires(1)] if schedule.enabled else [],
             "last_fired_at": state.last_fired_at.isoformat() if state and state.last_fired_at else None,
             "last_status": last_run.status if last_run else None,
         })
@@ -846,6 +851,19 @@ def runs(request, limit: int = 50, before: int | None = None):
             children_of.setdefault(child.parent_id, []).append(child)
         frontier = [c.id for c in children]
     return [_run_dict(run, children_of) for run in top]
+
+
+@api.delete("/runs")
+@blocking
+def clear_runs(request):
+    """Deletes the finished task runs with their subtask and feed runs. Runs still in progress are kept, because
+    the runner keeps writing to their records."""
+    from feedxcavator.models import TaskRun
+
+    finished = TaskRun.objects.filter(parent__isnull=True).exclude(status="running")
+    count = finished.count()
+    finished.delete()
+    return {"deleted": count}
 
 
 # log ----------------------------------------------------------------------------------------------

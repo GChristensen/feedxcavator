@@ -2,6 +2,7 @@
 // The Log tab (UI-15 to UI-17).
 import { nextTick, onMounted, reactive, ref, watch } from 'vue'
 import { api, describeError } from '../api'
+import { formatTime } from '../time'
 import { icon } from '../outline'
 
 const props = defineProps({ active: Boolean })
@@ -65,7 +66,7 @@ function toggle(set, number) {
 }
 
 function time(ms) {
-  return new Date(ms).toLocaleString()
+  return formatTime(ms)
 }
 
 onMounted(refresh)

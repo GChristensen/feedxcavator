@@ -2,6 +2,7 @@
 // The Settings tab (UI-18, with the changes of STO2-13, STO2-14 and STO2-15).
 import { inject, onMounted, reactive, ref } from 'vue'
 import { api, describeError } from '../api'
+import { formatTime } from '../time'
 
 const store = inject('store')
 
@@ -97,7 +98,7 @@ async function restart() {
 }
 
 function time(iso) {
-  return iso ? new Date(iso).toLocaleString() : ''
+  return iso ? formatTime(iso) : ''
 }
 
 onMounted(load)

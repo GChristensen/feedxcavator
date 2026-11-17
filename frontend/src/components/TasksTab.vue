@@ -1,8 +1,9 @@
 <script setup>
 // The Tasks tab (TSK2-1 to TSK2-7): a table of tasks; edits go to tasks.yaml, preserving its comments.
 // Tasks named only in the `tasks` field of feeds (TSK2-2) are listed too; editing one declares it.
-import { inject, onMounted, reactive, ref, watch } from 'vue'
+import { computed, inject, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import { api, describeError } from '../api'
+import { formatTime } from '../time'
 
 const props = defineProps({ active: Boolean })
 const store = inject('store')
@@ -17,7 +18,30 @@ const message = ref('')
 const failed = ref(false)
 const edits = reactive({}) // name -> field -> text
 const expanded = reactive({}) // name -> feeds of the task, when shown
-const adding = ref('')
+const filter = ref('')
+const blankTask = () => ({
+  name: '', concurrency: 'skip',
+  ...Object.fromEntries([...LISTS, ...TEXTS].map((f) => [f, ''])),
+})
+const adding = reactive(blankTask())
+const addingOpen = ref(false)
+const addingInput = ref(null) // the name input of the new-task row
+
+async function openAdding() {
+  addingOpen.value = true
+  await nextTick()
+  if (addingInput.value) addingInput.value.focus()
+}
+
+function closeAdding() {
+  addingOpen.value = false
+  Object.assign(adding, blankTask())
+}
+
+const shown = computed(() => {
+  const needle = filter.value.trim().toLowerCase()
+  return needle ? rows.value.filter((r) => r.name.toLowerCase().includes(needle)) : rows.value
+})
 
 function say(text, isError = false) {
   message.value = text
@@ -72,13 +96,20 @@ function commit(row, field) {
 }
 
 async function add() {
-  const name = adding.value.trim()
+  const name = adding.name.trim()
   if (!name) return say('A task needs a name.', true)
   if (rows.value.some((r) => r.name.toLowerCase() === name.toLowerCase() && r.declared)) {
     return say(`${name} is already declared.`, true)
   }
-  await change({ name, declared: true }, {}, () => {
-    adding.value = ''
+  const fields = {}
+  for (const f of LISTS) {
+    const values = splitList(adding[f])
+    if (values.length) fields[f] = values
+  }
+  for (const f of TEXTS) if (adding[f].trim()) fields[f] = adding[f].trim()
+  if (adding.concurrency !== 'skip') fields.concurrency = adding.concurrency
+  await change({ name, declared: true }, fields, () => {
+    closeAdding()
     say(`Task ${name} added to tasks.yaml.`)
   })
   return undefined
@@ -123,7 +154,7 @@ async function toggleFeeds(row) {
 }
 
 function time(iso) {
-  return iso ? new Date(iso).toLocaleString() : ''
+  return iso ? formatTime(iso) : ''
 }
 
 onMounted(refresh)
@@ -133,9 +164,13 @@ watch(() => props.active, (active) => active && refresh())
 <template>
   <div class="tab-pane">
     <div class="toolbar">
+      <button class="primary" :disabled="addingOpen" @click="openAdding">Add task</button>
       <button @click="refresh">Refresh</button>
       <button @click="store.openFile('tasks.yaml')">Edit tasks.yaml</button>
-      <span class="hint" :class="{ 'error-text': failed }">{{ message }}</span>
+      <input v-model="filter" type="search" placeholder="Filter by name" size="18" />
+      <span class="hint" :class="{ 'error-text': failed }">
+        {{ message || 'Lists are comma-separated. Durations look like 30m, 2h or 45s.' }}
+      </span>
     </div>
     <div v-if="errors.length" class="tab-pane padded error-text" style="flex: none; height: auto">
       <div v-for="(e, i) in errors" :key="i">tasks.yaml{{ e.line ? ':' + e.line : '' }}: {{ e.message }}</div>
@@ -161,7 +196,53 @@ watch(() => props.active, (active) => active && refresh())
           </tr>
         </thead>
         <tbody>
-          <template v-for="row in rows" :key="row.name">
+          <tr v-if="addingOpen" class="new-task" @keyup.enter="$event.target.tagName === 'INPUT' && add()"
+              @keyup.esc="closeAdding">
+            <td class="nowrap">
+              <input ref="addingInput" v-model="adding.name" type="text" class="mono" placeholder="new task name"
+                     size="14" />
+            </td>
+            <td class="field-stack">
+              <label><span>tags</span><input v-model="adding.tags" type="text" size="14" /></label>
+              <label><span>path</span><input v-model="adding.path" type="text" class="mono" size="14"
+                     placeholder="news/*" /></label>
+              <label><span>list</span><input v-model="adding.list" type="text" class="mono" size="14"
+                     placeholder="suffixes" /></label>
+            </td>
+            <td></td>
+            <td><input v-model="adding.run" type="text" class="mono" size="14" list="task-list-names" /></td>
+            <td><input v-model="adding.then" type="text" class="mono" size="14" list="task-list-names" /></td>
+            <td class="field-stack">
+              <label><span>pre</span><input v-model="adding.pre" type="text" class="mono" size="14"
+                     list="task-function-names" /></label>
+              <label><span>post</span><input v-model="adding.post" type="text" class="mono" size="14"
+                     list="task-function-names" /></label>
+            </td>
+            <td><input v-model="adding.call" type="text" class="mono" size="14" list="task-function-names" /></td>
+            <td>
+              <select v-model="adding.concurrency">
+                <option value="skip">skip</option>
+                <option value="queue">queue</option>
+                <option value="allow">allow</option>
+              </select>
+            </td>
+            <td class="field-stack">
+              <label><span>run</span><input v-model="adding.timeout" type="text" class="mono" size="6"
+                     placeholder="none" /></label>
+              <label><span>post</span><input v-model="adding.post_timeout" type="text" class="mono" size="6"
+                     placeholder="5m" /></label>
+            </td>
+            <td></td>
+            <td></td>
+            <td class="nowrap">
+              <button class="small primary" @click="add">Save</button>
+              <button class="small" @click="closeAdding">Cancel</button>
+            </td>
+          </tr>
+          <tr v-if="rows.length && !shown.length">
+            <td colspan="12" class="muted">No tasks match the filter.</td>
+          </tr>
+          <template v-for="row in shown" :key="row.name">
             <tr>
               <td class="nowrap">
                 <span class="mono">{{ row.name }}</span>
@@ -229,13 +310,6 @@ watch(() => props.active, (active) => active && refresh())
               </td>
             </tr>
           </template>
-          <tr>
-            <td colspan="2">
-              <input v-model="adding" type="text" class="mono" placeholder="new task name" size="18" @keyup.enter="add" />
-              <button class="small primary" @click="add">Add</button>
-            </td>
-            <td colspan="10" class="muted">Lists are comma-separated. Durations look like 30m, 2h or 45s.</td>
-          </tr>
         </tbody>
       </table>
     </div>

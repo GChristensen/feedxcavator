@@ -2,6 +2,7 @@
 // The Runs tab (UI2-9): recent task runs, expandable to their feed runs.
 import { onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { api, describeError } from '../api'
+import { formatTime } from '../time'
 
 const props = defineProps({ active: Boolean })
 
@@ -27,6 +28,17 @@ async function more() {
   runs.value = runs.value.concat(older)
 }
 
+async function clearRuns() {
+  if (!confirm('Delete all finished task runs? Runs in progress are kept.')) return
+  try {
+    await api.delete('/runs')
+    expanded.clear()
+    await refresh()
+  } catch (e) {
+    error.value = describeError(e)
+  }
+}
+
 function toggle(id) {
   expanded.has(id) ? expanded.delete(id) : expanded.add(id)
 }
@@ -38,7 +50,7 @@ function duration(seconds) {
 }
 
 function time(iso) {
-  return new Date(iso).toLocaleString()
+  return formatTime(iso)
 }
 
 function totals(run) {
@@ -77,6 +89,7 @@ watch(() => [props.active, auto.value], () => {
   <div class="tab-pane">
     <div class="toolbar">
       <button @click="refresh">Refresh</button>
+      <button @click="clearRuns">Clear</button>
       <label><input v-model="auto" type="checkbox" /> refresh every 5 seconds</label>
       <span class="hint error-text">{{ error }}</span>
     </div>

@@ -95,7 +95,7 @@ button.primary { background: var(--accent-dark); border-color: var(--accent); co
 button.danger:hover:not(:disabled) { border-color: var(--error); color: var(--error); }
 button.small { padding: 1px 7px; font-size: 12px; }
 
-input[type=text], input[type=password], input[type=number], select, textarea {
+input[type=text], input[type=search], input[type=password], input[type=number], select, textarea {
   background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 3px;
   padding: 4px 7px; font: inherit;
 }
