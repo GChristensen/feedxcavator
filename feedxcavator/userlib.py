@@ -444,11 +444,12 @@ telegram = _Telegram()
 
 
 def browser(profile="default", proxy=None):
-    """with browser(profile="default", proxy=None) as b: opens a stealth browser from the worker's pool,
-    connecting through the proxy named by `proxy` when given ((with-browser [b :proxy "default"]) in Hy).
-    b.open(url, wait_for=None, scroll=0) returns a page with html(), apply_selectors(feed), click(),
-    fill(), wait_for(selector, timeout, required=True) (False on a timeout when not required), evaluate(script, arg), screenshot(selector), solve_captcha(), text(), url and
-    cookies()."""
+    """with browser(profile="default", proxy=None) as b: takes a stealth browser from the worker's pool for the
+    block; in Hy, (with-browser [b :profile "default" :proxy "name"] body...). `profile` names the persistent data
+    directory data/browser/<profile>/ (cookies, logins); one profile is open in one browser at a time. `proxy`
+    names a proxy (defproxy, or `proxies` in config.yml) the browser connects through. The browser starts at the
+    beginning of the block and closes at its end, with its pages. In the web process (the console) the calls go
+    to the worker over RPC. The methods of `b` and of the pages it opens are listed in the Browser section."""
     from feedxcavator import browser as _browser
 
     return _browser.browser(profile, proxy)
@@ -537,6 +538,20 @@ CATEGORIES = [
     ("Telegram", [_Telegram.get_channel_messages, _Telegram.notify]),
 ]
 
+
+def _browser_methods():
+    from feedxcavator.browser import Browser, Page
+
+    b = [("b", Browser, name) for name in ("open", "cookies", "user_agent")]
+    page = [("page", Page, name) for name in (
+        "html", "text", "selector", "apply_selectors", "url", "goto", "click", "fill", "press", "wait_for", "wait",
+        "scroll", "evaluate", "screenshot", "solve_captcha", "close")]
+    return b + page
+
+
+# methods of the objects `browser` returns: shown on the API tab, not names in the user namespace
+METHODS = [("Browser", _browser_methods)]
+
 # Hy spellings that cannot be derived by mangling
 HY_ALIASES = {
     "filter-history!": filters.filter_history_update,
@@ -554,7 +569,9 @@ MACROS = [
                                          "requires the API token. `(defhandler name request ...)` receives the whole request."),
     ("(defproxy name :host ... :port ... :user ... :password ...)", "Defines a proxy."),
     ("(deftaskfn name [ctx] body...)", "Defines and registers a task function for tasks.yaml."),
-    ("(with-browser [b :profile \"default\"] body...)", "Runs the body with a browser from the worker's pool bound to `b`."),
+    ("(with-browser [b :profile \"default\" :proxy \"name\"] body...)",
+     "Runs the body with a browser from the worker's pool bound to `b` (see `browser`). Both options are optional; "
+     "(with-browser body...) binds `b` with the defaults. The methods are in the Browser section."),
     ("(log-fetch-errors body...)", "Every failed fetch inside the body writes an error to the log."),
     ("(safe-call form)", "Evaluates the form; on an exception prints the traceback and returns None."),
     ("(safely-repeat form)", "Evaluates the form, once more if it raises. `safely-repeat3` tries three times."),
@@ -643,6 +660,26 @@ def api_reference() -> list[dict]:
                 "name": name,
                 "hy": hy_names.get(id(fn)) or name.replace("_", "-"),
                 "signature": _signature(fn),
+                "doc": inspect.getdoc(fn) or "",
+            })
+        sections.append({"category": category, "entries": entries})
+    for category, methods in METHODS:
+        entries = []
+        for owner, cls, attr in methods():
+            member = inspect.getattr_static(cls, attr)
+            is_property = isinstance(member, property)
+            fn = member.fget if is_property else member
+            signature = "" if is_property else _signature(fn).replace("(self, ", "(").replace("(self)", "()")
+            signature = signature.replace("-> '", "-> ").rstrip("'")  # postponed annotations are strings
+            hy_name = attr.replace("_", "-")
+            if is_property:
+                hy = f"(. {owner} {hy_name})"
+            else:
+                hy = f"(.{hy_name} {owner}{'' if signature.startswith('()') else ' ...'})"
+            entries.append({
+                "name": f"{owner}.{attr}{signature}",
+                "hy": hy,
+                "signature": "",
                 "doc": inspect.getdoc(fn) or "",
             })
         sections.append({"category": category, "entries": entries})

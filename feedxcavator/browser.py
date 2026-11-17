@@ -368,6 +368,8 @@ class Page:
 
     @property
     def url(self) -> str:
+        """The current URL of the page, after redirects and navigations (a property: `page.url`, `(. page url)`
+        in Hy)."""
         return self._call("url")
 
     def selector(self):
@@ -383,17 +385,27 @@ class Page:
         return sel.apply_selectors(self.html(), feed, base_url=self.url, text_mode=True)
 
     def goto(self, url, wait_for=None, timeout=30):
+        """Navigates the page to `url` and waits for the DOM to load, then for `wait_for` (a CSS selector) when
+        given. `timeout` is in seconds. Returns the page, so calls chain. Later fetch_url calls to the host reuse
+        the browser's cookies and user agent."""
         self._call("goto", url, wait_for, timeout)
         self._owner._hand_over(url)
         return self
 
     def click(self, selector, timeout=30):
+        """Clicks the first element matching `selector` (CSS, or a Playwright selector such as "text=More"),
+        waiting up to `timeout` seconds for it to be visible and enabled. The click is made by the driver, which
+        some bot checks ignore (see solve_captcha)."""
         self._call("click", selector, timeout)
 
     def fill(self, selector, value, timeout=30):
+        """Replaces the value of the input or textarea matching `selector` with `value`, waiting up to `timeout`
+        seconds for the element."""
         self._call("fill", selector, value, timeout)
 
     def press(self, selector, key):
+        """Focuses the element matching `selector` and presses `key`: a key name such as "Enter", "ArrowDown"
+        or "Control+A", or a single character."""
         self._call("press", selector, key)
 
     def wait_for(self, selector, timeout=30, required=True) -> bool:
@@ -402,9 +414,13 @@ class Page:
         return self._call("wait_for", selector, timeout, required)
 
     def wait(self, seconds):
+        """Pauses for `seconds` with the page live (scripts keep running). Prefer wait_for when there is an
+        element to wait for."""
         self._call("wait", seconds)
 
     def scroll(self, times=1):
+        """Scrolls to the bottom of the page `times` times, 0.8 seconds apart, so infinite lists load more
+        items."""
         self._call("scroll", times)
 
     def evaluate(self, script, arg=None):
@@ -428,10 +444,13 @@ class Page:
         return solved
 
     def text(self, selector=None):
+        """The text content of the first element matching `selector` (None when nothing matches), or of the
+        whole document without one."""
         document = self.selector()
         return sel.text(sel.q1(document, selector) if selector else document)
 
     def close(self):
+        """Closes the page. Pages left open are closed with the browser at the end of the `with` block."""
         self._call("close_page")
 
 
@@ -444,17 +463,21 @@ class Browser:
         return self._transport.call(op, *args, **kwargs)
 
     def open(self, url, wait_for=None, scroll=0, timeout=30) -> Page:
-        """Opens a URL in a new tab. `wait_for` is a CSS selector to wait for, `scroll` a number of
-        scrolls to the bottom (for infinite lists)."""
+        """Opens `url` in a new page and returns it. `wait_for` is a CSS selector to wait for after the DOM
+        loads, `scroll` a number of scrolls to the bottom (for infinite lists), `timeout` the limit in seconds
+        for the navigation and for `wait_for`. Raises BrowserError when the page does not load. Later fetch_url
+        calls to the host reuse the browser's cookies and user agent."""
         page = Page(self, self._call("open", url, wait_for, scroll, timeout))
         self._hand_over(url)
         return page
 
     def cookies(self, url=None) -> dict:
+        """The cookies of the browser profile as a {name: value} dict, only those sent to `url` when given."""
         return self._call("cookies", url)
 
     @property
     def user_agent(self) -> str:
+        """The browser's user agent string (a property: `b.user_agent`)."""
         return self._call("user_agent")
 
     def _hand_over(self, url):

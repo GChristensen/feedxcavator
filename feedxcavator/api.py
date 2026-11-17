@@ -904,6 +904,115 @@ def clear_runs(request):
     return {"deleted": count}
 
 
+# WebSub subscriptions -----------------------------------------------------------------------------
+
+
+def _subscription_dict(sub, registry) -> dict:
+    info = registry.info_by_key(sub.feed_id)
+    return {
+        "id": sub.id, "feed_id": sub.feed_id, "title": info.title if info else None,
+        "suffix": info.suffix if info else None, "topic": sub.topic, "callback": sub.callback,
+        "verified": sub.verified, "lease_seconds": sub.lease_seconds,
+        "expires_at": sub.expires_at.isoformat() if sub.expires_at else None,
+        "created_at": sub.created_at.isoformat() if sub.created_at else None,
+    }
+
+
+@api.get("/subscriptions")
+@blocking
+def subscriptions(request):
+    """Lists the WebSub subscriptions, ordered by feed and callback."""
+    from feedxcavator.models import Subscription
+
+    registry = workspace.get_registry()
+    return [_subscription_dict(s, registry) for s in Subscription.objects.order_by("feed_id", "callback", "id")]
+
+
+class CallbackReplaceIn(Schema):
+    find: str
+    replace: str = ""
+    regex: bool = False
+    ignore_case: bool = False
+    dry_run: bool = False
+
+
+# declared before /subscriptions/{sub_id}, which would otherwise take this path and answer 405
+@api.post("/subscriptions/replace")
+@blocking
+def replace_in_callbacks(request, data: CallbackReplaceIn):
+    """Replaces a string (or a regular expression, with group references in `replace`) in every callback URL.
+    A change that would give a feed two subscriptions with the same callback, or an empty callback, is skipped.
+    With `dry_run` nothing is saved."""
+    from django.db import transaction
+
+    from feedxcavator.models import Subscription
+
+    if not data.find:
+        raise ApiError(400, "the search string is empty")
+    flags = re.IGNORECASE if data.ignore_case else 0
+    try:
+        pattern = re.compile(data.find if data.regex else re.escape(data.find), flags)
+    except re.error as e:
+        raise ApiError(400, f"invalid regular expression: {e}") from e
+    replacement = data.replace if data.regex else data.replace.replace("\\", "\\\\")
+
+    changed, skipped = [], []
+    with transaction.atomic():
+        subs = list(Subscription.objects.select_for_update().order_by("feed_id", "callback", "id"))
+        taken = {(s.feed_id, s.callback) for s in subs}
+        for sub in subs:
+            try:
+                new = pattern.sub(replacement, sub.callback).strip()
+            except (re.error, IndexError) as e:
+                raise ApiError(400, f"invalid replacement: {e}") from e
+            if new == sub.callback:
+                continue
+            entry = {"id": sub.id, "feed_id": sub.feed_id, "old": sub.callback, "new": new}
+            if not new or (sub.feed_id, new) in taken:
+                skipped.append({**entry, "reason": "empty callback" if not new else "duplicate callback"})
+                continue
+            taken.discard((sub.feed_id, sub.callback))
+            taken.add((sub.feed_id, new))
+            changed.append(entry)
+            if not data.dry_run:
+                Subscription.objects.filter(id=sub.id).update(callback=new)
+    return {"changed": changed, "skipped": skipped, "dry_run": data.dry_run}
+
+
+class CallbackIn(Schema):
+    callback: str
+
+
+@api.put("/subscriptions/{sub_id}")
+@blocking
+def update_subscription(request, sub_id: int, data: CallbackIn):
+    """Changes the callback URL of a subscription. The verification state and the lease are kept."""
+    from feedxcavator.models import Subscription
+
+    sub = Subscription.objects.filter(id=sub_id).first()
+    if sub is None:
+        raise ApiError(404, "no such subscription")
+    callback = data.callback.strip()
+    if not callback:
+        raise ApiError(400, "the callback URL is empty")
+    if Subscription.objects.filter(feed_id=sub.feed_id, callback=callback).exclude(id=sub.id).exists():
+        raise ApiError(409, "the feed already has a subscription with this callback")
+    sub.callback = callback
+    sub.save(update_fields=["callback"])
+    return _subscription_dict(sub, workspace.get_registry())
+
+
+@api.delete("/subscriptions/{sub_id}")
+@blocking
+def delete_subscription(request, sub_id: int):
+    from feedxcavator.models import Subscription
+
+    deleted, _ = Subscription.objects.filter(id=sub_id).delete()
+    if not deleted:
+        raise ApiError(404, "no such subscription")
+    return {"deleted": deleted}
+
+
 # log ----------------------------------------------------------------------------------------------
 
 

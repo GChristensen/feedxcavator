@@ -315,6 +315,10 @@ with browser() as b:
       (.apply-selectors feed)))
 ```
 
+A page can also be driven: `goto`, `click`, `fill`, `press`, `wait_for`, `wait`, `scroll`, `evaluate` (with
+`load_js` for scripts kept in files), `screenshot`, `html`, `text` and `url`. The Browser section of the
+console's API tab describes every method of the browser and the page.
+
 Sites behind a security check (DDoS-Guard, a bot check of their own) show the content only after the check passes
 and reloads the page, which can take ten seconds or more. Wait for the content rather than for a fixed time:
 `page.wait_for(selector, timeout, required=False)` keeps waiting through the reload and returns False on a timeout

@@ -238,3 +238,8 @@ pre.server-log { margin: 0; padding: 8px 12px; font: 12px var(--mono); white-spa
 .tasks-grid tr.task-feeds td { border-top: none; padding-top: 0; }
 .task-feed { display: inline-block; margin: 0 6px 4px 0; padding: 0 7px; border: 1px solid var(--border);
   border-radius: 9px; font-size: 12px; }
+
+/* subscriptions */
+.callback-input { width: 100%; }
+.callback-input.edited { border-color: var(--accent); }
+.replace-preview { padding: 6px 8px 10px; border-bottom: 1px solid var(--border); background: var(--panel-2); }

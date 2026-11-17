@@ -6,6 +6,7 @@ import WorkspaceTab from './components/WorkspaceTab.vue'
 import TasksTab from './components/TasksTab.vue'
 import SchedulesTab from './components/SchedulesTab.vue'
 import RunsTab from './components/RunsTab.vue'
+import SubscriptionsTab from './components/SubscriptionsTab.vue'
 import WordFiltersTab from './components/WordFiltersTab.vue'
 import LogTab from './components/LogTab.vue'
 import SettingsTab from './components/SettingsTab.vue'
@@ -18,6 +19,7 @@ const TABS = [
   { id: 'tasks', title: 'Tasks' },
   { id: 'schedules', title: 'Schedules' },
   { id: 'runs', title: 'Runs' },
+  { id: 'subscriptions', title: 'Subscriptions' },
   { id: 'wordfilters', title: 'Word filters' },
   { id: 'log', title: 'Log' },
   { id: 'settings', title: 'Settings' },
@@ -155,6 +157,8 @@ onUnmounted(() => {
       <TasksTab v-if="visited.has('tasks')" v-show="current === 'tasks'" :active="current === 'tasks'" />
       <SchedulesTab v-if="visited.has('schedules')" v-show="current === 'schedules'" :active="current === 'schedules'" />
       <RunsTab v-if="visited.has('runs')" v-show="current === 'runs'" :active="current === 'runs'" />
+      <SubscriptionsTab v-if="visited.has('subscriptions')" v-show="current === 'subscriptions'"
+                        :active="current === 'subscriptions'" />
       <WordFiltersTab v-if="visited.has('wordfilters')" v-show="current === 'wordfilters'" ref="wordfilters"
                       :active="current === 'wordfilters'" />
       <LogTab v-if="visited.has('log')" v-show="current === 'log'" :active="current === 'log'" />

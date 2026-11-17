@@ -665,3 +665,41 @@ def test_console_api_tasks_table(ws, client):
     assert post(client, "/tasks/delete", {"task": "fresh"}).status_code == 200
     assert post(client, "/tasks/delete", {"task": "fresh"}).status_code == 404
     assert "fresh" not in workspace.get_registry().tasks
+
+
+def test_subscriptions_edit_and_replace(ws, client):
+    ws({"feeds/a/feed.yaml": "title: A\nsource: https://e.test\nselectors: {item: p}\n"}, startup=True)
+    now = "2024-01-01T00:00:00Z"
+    one = Subscription.objects.create(feed_id="a", topic="t", callback="http://old.test/cb/1", verified=True,
+                                      created_at=now)
+    Subscription.objects.create(feed_id="a", topic="t", callback="http://old.test/cb/2", created_at=now)
+    Subscription.objects.create(feed_id="a", topic="t", callback="http://new.test/cb/2", created_at=now)
+    Subscription.objects.create(feed_id="gone", topic="t", callback="http://old.test/x", created_at=now)
+
+    listed = client.get(f"{API}/subscriptions").json()
+    assert [s["callback"] for s in listed] == ["http://new.test/cb/2", "http://old.test/cb/1",
+                                               "http://old.test/cb/2", "http://old.test/x"]
+    assert listed[0]["title"] == "A" and listed[3]["title"] is None
+
+    url = f"{API}/subscriptions/{one.id}"
+    assert client.put(url, data=json.dumps({"callback": "http://old.test/cb/2"}),
+                      content_type="application/json").status_code == 409
+    response = client.put(url, data=json.dumps({"callback": " http://old.test/cb/9 "}),
+                          content_type="application/json")
+    assert response.status_code == 200 and response.json()["callback"] == "http://old.test/cb/9"
+    assert Subscription.objects.get(id=one.id).verified
+
+    preview = post(client, "/subscriptions/replace", {"find": "old.test", "replace": "new.test", "dry_run": True})
+    result = preview.json()
+    assert len(result["changed"]) == 2 and [s["reason"] for s in result["skipped"]] == ["duplicate callback"]
+    assert Subscription.objects.filter(callback__startswith="http://old.test").count() == 3
+
+    post(client, "/subscriptions/replace", {"find": "old.test", "replace": "new.test"})
+    assert sorted(Subscription.objects.values_list("callback", flat=True)) == [
+        "http://new.test/cb/2", "http://new.test/cb/9", "http://new.test/x", "http://old.test/cb/2"]
+
+    post(client, "/subscriptions/replace", {"find": r"/cb/(\d)", "replace": r"/hook/\1", "regex": True})
+    assert Subscription.objects.filter(callback__contains="/hook/").count() == 3
+    assert post(client, "/subscriptions/replace", {"find": "(", "regex": True}).status_code == 400
+
+    assert client.delete(url).status_code == 200 and not Subscription.objects.filter(id=one.id).exists()
