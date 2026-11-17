@@ -36,7 +36,7 @@ DEFAULTS = {
     "worker-sequential": 1,
     "browser-pool-size": 1,
     "browser-headless": None,  # None: headful when a display (or Xvfb) is available, else headless
-    "browser-engine": "patchright",  # patchright | camoufox | playwright
+    "browser-engine": "camoufox",  # camoufox | patchright | playwright
     "browser-channel": "chrome",
     "browser-display": None,  # Linux: an X display for the browser (and captcha clicks) when DISPLAY is unset
     "captcha-position": None,  # [x, y]: screen point solve-captcha clicks when it finds no Turnstile widget

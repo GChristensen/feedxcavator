@@ -2,7 +2,7 @@
 
 User code sees one interface: `with browser(profile) as b: page = b.open(url)`. Browsers live in a pool
 owned by the worker. In the web process the same interface talks to the worker over RPC (PRC-4).
-The engine is any Playwright-compatible one: patchright (default), camoufox or playwright.
+The engine is any Playwright-compatible one: camoufox (default), patchright or playwright.
 """
 
 from __future__ import annotations
@@ -25,6 +25,11 @@ _pool: "BrowserPool | None" = None  # set in the worker
 
 class BrowserError(RuntimeError):
     pass
+
+
+def _not_installed(engine: str) -> str:
+    return (f"browser-engine is {engine}, but it is not installed: run "
+            f"python3 install.py --with-browser={engine} in the installation directory (see the manual)")
 
 
 # the engine side (worker only) ----------------------------------------------------------------
@@ -97,7 +102,7 @@ class _Session:
             raise BrowserError(f"failed to start the browser: {self._error or 'timeout'}")
 
     def _launch(self):
-        engine = str(conf.get("browser-engine", "patchright")).lower()
+        engine = str(conf.get("browser-engine", "camoufox")).lower()
         profile_dir = conf.DATA_DIR / "browser" / self.profile
         profile_dir.mkdir(parents=True, exist_ok=True)
         headless = self._headless = _headless()
@@ -105,9 +110,7 @@ class _Session:
             try:
                 import camoufox  # noqa: F401
             except ImportError:
-                raise BrowserError("browser-engine is camoufox, but it is not installed: run "
-                                   "uv pip install --python .venv/bin/python camoufox, then "
-                                   ".venv/bin/python -m camoufox fetch (see the README)") from None
+                raise BrowserError(_not_installed(engine)) from None
 
             from feedxcavator import camoufox_identity
 
@@ -115,10 +118,13 @@ class _Session:
             manager, self._context = camoufox_identity.start(profile_dir, headless, **extra)
             self._closers.append(lambda: manager.__exit__(None, None, None))
             return
-        if engine == "playwright":
-            from playwright.sync_api import sync_playwright
-        else:
-            from patchright.sync_api import sync_playwright
+        try:
+            if engine == "playwright":
+                from playwright.sync_api import sync_playwright
+            else:
+                from patchright.sync_api import sync_playwright
+        except ImportError:
+            raise BrowserError(_not_installed(engine)) from None
         playwright = sync_playwright().start()
         self._closers.append(playwright.stop)
         channel = conf.get("browser-channel", "chrome")
@@ -484,7 +490,7 @@ class Browser:
         """BRW-5: later fetch_url calls for the host reuse the cookies and user agent."""
         try:
             host_url = "{0.scheme}://{0.netloc}/".format(urlsplit(url))
-            engine = str(conf.get("browser-engine", "patchright")).lower()
+            engine = str(conf.get("browser-engine", "camoufox")).lower()
             fetch.adopt_browser_session(url, self._call("cookies", host_url), self._call("user_agent"),
                                         "firefox" if engine == "camoufox" else "chrome")
         except Exception as e:  # noqa: BLE001

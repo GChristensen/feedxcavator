@@ -34,12 +34,14 @@ dependencies = [
     "markdown>=3.6",
     "telethon>=1.36",
     "python-socks>=2.4",
-    "patchright>=1.50",
     "edn_format>=0.7",
 ]
 
+# install.py selects these; --with-browser installs camoufox unless another engine is named
 [project.optional-dependencies]
 camoufox = ["camoufox>=0.4"]
+patchright = ["patchright>=1.50"]
+playwright = ["playwright>=1.45"]
 captcha = ["pyautogui>=0.9.54"]
 postgres = ["psycopg[binary]>=3.1"]
 dev = ["pytest>=8"]

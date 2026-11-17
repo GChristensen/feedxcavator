@@ -1,8 +1,7 @@
 # Feedxcavator manual
 
 This manual goes from a first feed written in a few lines of YAML to feeds written in code, background tasks,
-browsers and custom HTTP handlers. Installation is described in the README. The console shows the manual on its
-**Manual** tab; the file itself is `feedxcavator/manual.md`.
+browsers and custom HTTP handlers. 
 
 ## How Feedxcavator works
 
@@ -681,7 +680,7 @@ This needs pyautogui and a headful browser on a display the worker can reach, wi
 others:
 
 ```
-uv pip install --python .venv/bin/python "pyautogui>=0.9.54"     # Windows: --python .venv\Scripts\python
+python3 install.py --with-captcha
 ```
 
 On Linux, when the worker runs as another user than the desktop session, allow it on the desktop display with
@@ -694,7 +693,7 @@ The browser is set up in `config.yml`:
 
 | Key | Default | Meaning |
 |---|---|---|
-| `browser-engine` | `patchright` | `patchright`, `camoufox` (Firefox based) or `playwright` |
+| `browser-engine` | `camoufox` | `camoufox` (Firefox based), `patchright` or `playwright` |
 | `browser-channel` | `chrome` | the installed browser patchright or playwright drives; the bundled Chromium when it is missing |
 | `browser-pool-size` | `1` | how many browsers may run at once; further jobs wait |
 | `browser-headless` | see below | `true` or `false`; by default headful on Linux when a display or Xvfb is available, otherwise headless |
@@ -713,29 +712,17 @@ Fedora/RHEL, `xvfb` on Debian/Ubuntu). `browser-headless: true` forces headless 
 
 | Engine | Browser | Setup |
 |---|---|---|
-| `patchright` (default) | the installed Chrome (`browser-channel`), patched against automation detection | installed with the package; without Chrome, `.venv/bin/python -m patchright install chromium` |
-| `camoufox` | a Firefox build with fingerprint spoofing; harder to detect than patchright on some sites | optional, see below |
-| `playwright` | stock Playwright Chromium, no stealth | `uv pip install --python .venv/bin/python playwright`, then `.venv/bin/python -m playwright install chromium` |
+| `camoufox` (default) | a Firefox build with fingerprint spoofing | `install.py --with-browser` |
+| `patchright` | the installed Chrome (`browser-channel`), patched against automation detection | `install.py --with-browser=patchright` |
+| `playwright` | stock Playwright Chromium, no stealth | `install.py --with-browser=playwright` |
 
-camoufox is not installed with the package. Install it into the server's virtual environment, then download its
-browser build (stored outside the venv, in the user's cache folder):
-
-```
-uv pip install --python .venv/bin/python "camoufox>=0.4"     # Windows: --python .venv\Scripts\python
-.venv/bin/python -m camoufox fetch
-```
-
-A venv created with `uv venv` has no pip, so `.venv/bin/pip` and `python -m pip` do not exist there. Without uv,
-add pip first:
-
-```
-.venv/bin/python -m ensurepip --upgrade
-.venv/bin/python -m pip install "camoufox>=0.4"
-.venv/bin/python -m camoufox fetch
-```
-
-Then set `browser-engine: camoufox` and restart the server. If the engine is set but the package is missing, a
-browser feed fails with "browser-engine is camoufox, but it is not installed".
+No engine is installed with the core package. `install.py` installs the chosen ones into the virtual environment
+and downloads their browsers: the Camoufox build (kept in the user's cache folder, outside the venv), or for
+patchright and playwright their Chromium when no Chrome is installed. It then test-launches Camoufox; on Linux a
+failure there usually means missing system libraries (GTK 3, libX11-xcb, ALSA), which the distribution's firefox
+package brings in. Several engines can be installed at once (`--with-browser=camoufox,patchright`); the one in
+use is `browser-engine`, and switching it needs a restart. If the engine set there is not installed, a browser
+feed fails with "browser-engine is patchright, but it is not installed".
 
 With camoufox, each profile keeps one fingerprint for the host's OS in
 `data/browser/<profile>/feedxcavator-fingerprint.json`, created on the first launch, so the sign-in script and the

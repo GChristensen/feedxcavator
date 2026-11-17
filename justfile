@@ -2,6 +2,7 @@
 #
 #   just run [--dev]                    start the server in a new cmd window
 #   just build                          clean install of the frontend packages and a console build
+#   just lock                           update uv.lock and constraints.txt after a dependency change
 #   just deploy                         copy the code to the server
 #   just pull-data                      replace local data/, workspace/ and config.yml with the server's
 #   just remote='\\host\share\dir' deploy   use another installation directory
@@ -40,8 +41,13 @@ deploy:
     robocopy feedxcavator '{{remote}}\feedxcavator' /MIR /XD __pycache__ {{rc}}{{ok}}
     robocopy deploy '{{remote}}\deploy' /MIR {{rc}}{{ok}}
     robocopy docs '{{remote}}\docs' /MIR {{rc}}{{ok}}
-    robocopy . '{{remote}}' pyproject.toml README.md config.example.yml *.sh feedxcavator.cmd {{rc}}{{ok}}
-    @echo 'Deployed. Restart the server; if pyproject.toml dependencies changed, reinstall them there first.'
+    robocopy . '{{remote}}' pyproject.toml uv.lock constraints.txt install.py README.md config.example.yml *.sh feedxcavator.cmd {{rc}}{{ok}}
+    @echo 'Deployed. If dependencies changed, run python3 install.py there first. Then restart the server.'
+
+# Update uv.lock from pyproject.toml and export the pinned versions for the pip path of install.py.
+lock:
+    uv lock
+    uv export --all-extras --no-hashes --no-emit-project --format requirements-txt -o constraints.txt --quiet
 
 # Replace local data/, workspace/ and config.yml with the server's copy. Images (data/files/blob) are not copied.
 pull-data:

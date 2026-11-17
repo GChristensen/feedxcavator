@@ -28,7 +28,7 @@ service-task:                    # purge old images, log entries, history and ru
   max-age-days: 2                # images and log entries older than this many days are deleted
 
 # A Django database URL. SQLite in WAL mode by default; PostgreSQL also works:
-#   postgres://user:password@localhost:5432/feedxcavator   (pip install "feedxcavator[postgres]")
+#   postgres://user:password@localhost:5432/feedxcavator   (python3 install.py --with-postgres)
 database-connection-url: 'sqlite:///data/feedxcavator.db'
 
 workspace: workspace             # the directory with feeds, code, tasks.yaml and schedules.yaml
@@ -39,7 +39,7 @@ worker-sequential: 1             # workers for feeds with parallel: false
 run-history-days: 30             # task and feed run records are pruned after this many days
 
 # Browser automation (used only by feeds with fetch.backend: browser and by browser() in code)
-browser-engine: camoufox         # patchright | camoufox | playwright
+browser-engine: camoufox         # camoufox | patchright | playwright (install.py --with-browser=ENGINE)
 browser-channel: chrome          # the installed browser patchright drives; falls back to its bundled Chromium
 browser-pool-size: 1
 #browser-headless: false         # default: headful when a display or Xvfb is available on Linux, else headless

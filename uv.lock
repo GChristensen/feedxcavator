@@ -590,7 +590,6 @@ dependencies = [
     { name = "lxml" },
     { name = "markdown" },
     { name = "parsel" },
-    { name = "patchright" },
     { name = "psutil" },
     { name = "pydantic" },
     { name = "python-dateutil" },
@@ -615,6 +614,12 @@ captcha = [
 dev = [
     { name = "pytest" },
 ]
+patchright = [
+    { name = "patchright" },
+]
+playwright = [
+    { name = "playwright" },
+]
 postgres = [
     { name = "psycopg", extra = ["binary"] },
 ]
@@ -637,7 +642,8 @@ requires-dist = [
     { name = "lxml", specifier = ">=5" },
     { name = "markdown", specifier = ">=3.6" },
     { name = "parsel", specifier = ">=1.9" },
-    { name = "patchright", specifier = ">=1.50" },
+    { name = "patchright", marker = "extra == 'patchright'", specifier = ">=1.50" },
+    { name = "playwright", marker = "extra == 'playwright'", specifier = ">=1.45" },
     { name = "psutil", specifier = ">=5.9" },
     { name = "psycopg", extras = ["binary"], marker = "extra == 'postgres'", specifier = ">=3.1" },
     { name = "pyautogui", marker = "extra == 'captcha'", specifier = ">=0.9.54" },
@@ -654,7 +660,7 @@ requires-dist = [
     { name = "uvicorn", specifier = ">=0.30" },
     { name = "watchfiles", specifier = ">=0.22" },
 ]
-provides-extras = ["camoufox", "captcha", "postgres", "dev"]
+provides-extras = ["camoufox", "patchright", "playwright", "captcha", "postgres", "dev"]
 
 [[package]]
 name = "fpgen"
