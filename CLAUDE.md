@@ -16,6 +16,8 @@ a delta over `REQUIREMENTS.md` in the same folder. Code comments cite requiremen
 .venv\Scripts\python -m pytest                        # all tests (about 15 s)
 .venv\Scripts\python -m pytest tests/test_web.py -k handlers
 cd frontend && npm run build                          # rebuilds feedxcavator/static/console (committed)
+just build-demo                                       # rebuilds the static demo in demo/ (committed, GitHub Pages)
+just demo-server; just record-demo                    # records the demo fixtures from demo/home, then rebuilds
 .venv\Scripts\python -m feedxcavator run              # supervisor: web + worker
 .venv\Scripts\python -m feedxcavator manage makemigrations feedxcavator
 ```
@@ -114,6 +116,10 @@ directory, `handlers/`, then `tasks.yaml` and `schedules.yaml`.
   at startup.
 - **Frontend changes** need `npm run build`; the built assets under `feedxcavator/static/console` are committed.
   `mode-hy.js` lists the prelude names for highlighting and should follow `userlib.py` and `hylib.hy`.
+- **The demo** (`demo/`, built with `VITE_DEMO` as one iife script so it opens from `file://`) answers every console call in `frontend/src/demo/mock.js`. A new
+  or changed API endpoint the console uses needs a route there; fixtures come from `tools/record_demo.py` (README,
+  Demo), run against the sample workspace `demo/workspace/`, never the real one. The demo build must not empty
+  `demo/`: it also holds that workspace and the git-ignored recording home `demo/home/` (database, browser logins).
 - **User documentation** is `feedxcavator/manual.md` (shown on the console's Manual tab through `GET
   /front/api/manual`); `README.md` keeps only the overview and installation. Document a user-visible change in the
   manual.

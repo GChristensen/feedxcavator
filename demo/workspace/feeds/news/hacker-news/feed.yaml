@@ -1,0 +1,13 @@
+title: 'Hacker News'
+suffix: hacker-news
+source: https://news.ycombinator.com/
+tags: [news]
+selectors:
+  item: tr.athing
+  title: .titleline > a
+  link: .titleline > a
+  author: .sitestr
+filter:
+  - wordfilter: {name: noise, fields: [title]}
+  - limit: 30
+tasks: [news]

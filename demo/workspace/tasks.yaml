@@ -1,0 +1,11 @@
+# A feed belongs to the tasks named in its `tasks` list. A task in `run` runs as a subtask.
+
+tasks:
+  news:
+    concurrency: skip
+
+  browser:
+    timeout: 600
+
+  morning:
+    run: [news, browser]

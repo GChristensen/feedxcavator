@@ -16,6 +16,8 @@ export class ApiError extends Error {
 }
 
 async function request(method, path, { query, body, form } = {}) {
+  // the static demo (npm run build:demo) answers from recorded fixtures; the normal build drops this branch
+  if (import.meta.env.VITE_DEMO) return (await import('./demo/mock.js')).handle(method, path, { query, body, form })
   let url = BASE + path
   if (query) {
     const params = new URLSearchParams()

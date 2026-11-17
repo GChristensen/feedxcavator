@@ -1,0 +1,14 @@
+title: 'YouTube: Orbital Lab'
+suffix: youtube-orbital-lab
+# A fictional channel page (demo/sites/youtube.html, served by tools/record_demo.py) with the markup of a
+# youtube.com/@channel/videos page. Its cards are drawn by a script, so youtube.hy reads it in Camoufox.
+source: http://127.0.0.1:21901/youtube.html
+tags: [browser]
+extractor: youtube-channel
+selectors:
+  item: ytd-rich-item-renderer
+  title: '#video-title'
+  link: 'a#video-title-link'
+  image: 'img'
+  summary: '#metadata-line'
+tasks: [browser]

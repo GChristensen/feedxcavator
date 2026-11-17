@@ -1,0 +1,1658 @@
+{
+ "recorded_at": "2026-11-17T16:50:19+0400",
+ "settings": {
+  "subscription_url": "",
+  "version": "4.0.0",
+  "restartable": false,
+  "token_created_at": null,
+  "images": 0,
+  "worker_alive": true,
+  "authentication": false,
+  "workspace": "/srv/feedxcavator/workspace",
+  "workspace_empty": false
+ },
+ "feeds": [
+  {
+   "path": "news/hacker-news",
+   "dir": "feeds/news/hacker-news",
+   "id": null,
+   "key": "hacker-news",
+   "title": "Hacker News",
+   "suffix": "hacker-news",
+   "enabled": true,
+   "tasks": [
+    "news"
+   ],
+   "tags": [
+    "news"
+   ],
+   "status": "ok",
+   "error": null
+  },
+  {
+   "path": "news/lobsters",
+   "dir": "feeds/news/lobsters",
+   "id": null,
+   "key": "lobsters",
+   "title": "Lobsters",
+   "suffix": "lobsters",
+   "enabled": true,
+   "tasks": [
+    "news"
+   ],
+   "tags": [
+    "news"
+   ],
+   "status": "ok",
+   "error": null
+  },
+  {
+   "path": "browser/x-orbital-lab",
+   "dir": "feeds/browser/x-orbital-lab",
+   "id": null,
+   "key": "x-orbital-lab",
+   "title": "X: Orbital Lab",
+   "suffix": "x-orbital-lab",
+   "enabled": true,
+   "tasks": [
+    "browser"
+   ],
+   "tags": [
+    "browser"
+   ],
+   "status": "ok",
+   "error": null
+  },
+  {
+   "path": "browser/youtube-orbital-lab",
+   "dir": "feeds/browser/youtube-orbital-lab",
+   "id": null,
+   "key": "youtube-orbital-lab",
+   "title": "YouTube: Orbital Lab",
+   "suffix": "youtube-orbital-lab",
+   "enabled": true,
+   "tasks": [
+    "browser"
+   ],
+   "tags": [
+    "browser"
+   ],
+   "status": "ok",
+   "error": null
+  }
+ ],
+ "files": {
+  "feeds/browser/x-orbital-lab/feed.yaml": "title: 'X: Orbital Lab'\nsuffix: x-orbital-lab\n# A fictional profile page (demo/sites/x.html, served by tools/record_demo.py). Its posts are drawn by a script\n# and more load on scrolling, as on x.com, so x.py reads it in Camoufox. For a real profile, use its address and\n# a browser profile signed in to X: params: {profile: x}, then ./firefox-profile.sh x https://x.com\nsource: https://gchristensen.github.io/feedxcavator/demo/sites/x.html\ntags: [browser]\nextractor: x-profile\nselectors:\n  item: 'article[data-testid=tweet]'\n  title: '[data-testid=tweetText]'\n  summary: '[data-testid=tweetText]'\n  link: 'a[href*=\"/status/\"]'\n  image: '[data-testid=tweetPhoto] img'\n  published: {css: 'time::attr(datetime)', parse: date}\ntasks: [browser]\n",
+  "feeds/browser/x-orbital-lab/x.py": "# The simplest browser extractor: open the page in Camoufox, wait for the posts, scroll a little to load\n# more, and read them with the selectors of feed.yaml.\n\n@extractor(\"x-profile\")\ndef x_profile(feed):\n    profile = (feed.params or {}).get(\"profile\", \"default\")\n    with browser(profile=profile) as b:\n        page = b.open(feed.source, wait_for=\"article[data-testid=tweet]\", scroll=2, timeout=60)\n        return page.apply_selectors(feed)\n",
+  "feeds/browser/youtube-orbital-lab/feed.yaml": "title: 'YouTube: Orbital Lab'\nsuffix: youtube-orbital-lab\n# A fictional channel page (demo/sites/youtube.html, served by tools/record_demo.py) with the markup of a\n# youtube.com/@channel/videos page. Its cards are drawn by a script, so youtube.hy reads it in Camoufox.\nsource: https://gchristensen.github.io/feedxcavator/demo/sites/youtube.html\ntags: [browser]\nextractor: youtube-channel\nselectors:\n  item: ytd-rich-item-renderer\n  title: '#video-title'\n  link: 'a#video-title-link'\n  image: 'img'\n  summary: '#metadata-line'\ntasks: [browser]\n",
+  "feeds/browser/youtube-orbital-lab/youtube.hy": ";; The simplest browser extractor in Hy: open the channel in Camoufox, wait for the video cards,\n;; and read them with the selectors of feed.yaml.\n\n(defextractor youtube-channel [feed]\n  (with-browser [b]\n    (-> (.open b (:source feed) :wait-for \"ytd-rich-item-renderer\" :scroll 1 :timeout 60)\n        (.apply-selectors feed))))\n",
+  "feeds/news/hacker-news/feed.yaml": "title: 'Hacker News'\nsuffix: hacker-news\nsource: https://news.ycombinator.com/\ntags: [news]\nselectors:\n  item: tr.athing\n  title: .titleline > a\n  link: .titleline > a\n  author: .sitestr\nfilter:\n  - wordfilter: {name: noise, fields: [title]}\n  - limit: 30\ntasks: [news]\n",
+  "feeds/news/lobsters/feed.yaml": "title: 'Lobsters'\nsuffix: lobsters\nsource: https://lobste.rs/\ntags: [news]\nselectors:\n  item: .story\n  title: a.u-url\n  link: a.u-url\n  author: a.u-author\n  category: {css: 'a.tag::text', many: true}\nfilter:\n  - wordfilter: {name: noise, fields: [title]}\ntasks: [news]\n",
+  "schedules.yaml": "schedules:\n  - {task: morning, cron: \"15 7 * * *\"}\n  - {task: news, cron: \"0 */2 * * *\"}\n",
+  "scratch.hy": ";; Scratch: press Run to evaluate; what it prints shows below. The browser runs in the worker.\n\n(with-browser [b]\n  (setv page (.open b \"https://gchristensen.github.io/feedxcavator/demo/sites/youtube.html\" :wait-for \"#video-title\"))\n  (for [title (.evaluate page \"[...document.querySelectorAll('#video-title')].map(e => e.textContent)\")]\n    (print title)))\n",
+  "tasks.yaml": "# A feed belongs to the tasks named in its `tasks` list. A task in `run` runs as a subtask.\n\ntasks:\n  news:\n    concurrency: skip\n\n  browser:\n    timeout: 600\n\n  morning:\n    run: [news, browser]\n"
+ },
+ "tests": {
+  "feeds/news/hacker-news/feed.yaml": {
+   "output": "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<rss xmlns:atom=\"http://www.w3.org/2005/Atom\" xmlns:content=\"http://purl.org/rss/1.0/modules/content/\" version=\"2.0\" xml:base=\"https://news.ycombinator.com/\">\n  <channel>\n    <title>Hacker News</title>\n    <link>https://news.ycombinator.com/</link>\n    <description/>\n    <atom:link href=\"https://feeds.example.com/feed/hacker-news\" rel=\"self\" type=\"application/rss+xml\"/>\n    <pubDate>Tue, 17 Nov 2026 12:44:23 +0000</pubDate>\n    <lastBuildDate>Tue, 17 Nov 2026 12:44:23 +0000</lastBuildDate>\n    <item>\n      <title>Carnegie Mellon is putting computer science courses on YouTube for free</title>\n      <link>https://www.cs.cmu.edu/learn/</link>\n      <pubDate>Tue, 17 Nov 2026 12:44:17 +0000</pubDate>\n      <author>cmu.edu</author>\n      <description/>\n    </item>\n    <item>\n      <title>VisualBasic.World: A gallery of Planet Source Code programs from 1997 to 2012</title>\n      <link>https://visualbasic.world/</link>\n      <pubDate>Tue, 17 Nov 2026 12:44:12 +0000</pubDate>\n      <author>visualbasic.world</author>\n      <description/>\n    </item>\n    <item>\n      <title>New Evidence Shows School Phone Bans Are Gradually Improving Test Scores</title>\n      <link>https://www.nytimes.com/2026/11/17/upshot/school-phone-bans-study-scores.html</link>\n      <pubDate>Tue, 17 Nov 2026 12:44:07 +0000</pubDate>\n      <author>nytimes.com</author>\n      <description/>\n    </item>\n    <item>\n      <title>Japan's Hometown Tax (2018)</title>\n      <link>https://www.kalzumeus.com/2018/10/19/japanese-hometown-tax/</link>\n      <pubDate>Tue, 17 Nov 2026 12:44:02 +0000</pubDate>\n      <author>kalzumeus.com</author>\n      <description/>\n    </item>\n    <item>\n      <title>BugMeNot has closed</title>\n      <link>https://www.bugmenot.com/</link>\n      <pubDate>Tue, 17 Nov 2026 12:43:57 +0000</pubDate>\n      <author>bugmenot.com</author>\n      <description/>\n    </item>\n    <item>\n      <title>Optimizely compromised, served malware on Zoom, GitLab</title>\n      <link>https://blog.report-uri.com/worlds-largest-brands-infected-with-malware-via-optimizely/</link>\n      <pubDate>Tue, 17 Nov 2026 12:43:52 +0000</pubDate>\n      <author>report-uri.com</author>\n      <description/>\n    </item>\n    <item>\n      <title>Nimony: A New Compiler for Nim</title>\n      <link>https://nimony.org/</link>\n      <pubDate>Tue, 17 Nov 2026 12:43:47 +0000</pubDate>\n      <author>nimony.org</author>\n      <description/>\n    </item>\n    <item>\n      <title>Rows vs. Columns: How different are they, really?</title>\n      <link>https://spiraldb.com/blog/rows-vs-columns</link>\n      <pubDate>Tue, 17 Nov 2026 12:43:42 +0000</pubDate>\n      <author>spiraldb.com</author>\n      <description/>\n    </item>\n    <item>\n      <title>How the Claude Code team thinks about verification</title>\n      <link>https://claude.dev/blog/how-the-claude-code-team-thinks-about-verification/</link>\n      <pubDate>Tue, 17 Nov 2026 12:43:37 +0000</pubDate>\n      <author>claude.dev</author>\n      <description/>\n    </item>\n    <item>\n      <title>If an App Asks for Full Disk Access or System and App Protection Override</title>\n      <link>https://support.apple.com/en-us/149699</link>\n      <pubDate>Tue, 17 Nov 2026 12:43:32 +0000</pubDate>\n      <author>support.apple.com</author>\n      <description/>\n    </item>\n    <item>\n      <title>Turbo Pascal Compiler Written in Turbo Pascal</title>\n      <link>https://turbo51.com/compiler-design/tpc16-turbo-pascal-compiler-written-in-turbo-pascal</link>\n      <pubDate>Tue, 17 Nov 2026 12:43:27 +0000</pubDate>\n      <author>turbo51.com</author>\n      <description/>\n    </item>\n    <item>\n      <title>Why 3dfx 1 cards had such a washed out color output?</title>\n      <link>https://twitter.com/id_aa_carmack/status/2122478083319992513</link>\n      <pubDate>Tue, 17 Nov 2026 12:43:22 +0000</pubDate>\n      <author>twitter.com/id_aa_carmack</author>\n      <description/>\n    </item>\n    <item>\n      <title>Chemistry is Actually Geometry</title>\n      <link>https://chillphysicsenjoyer.substack.com/p/chemistry-is-actually-geometry</link>\n      <pubDate>Tue, 17 Nov 2026 12:43:17 +0000</pubDate>\n      <author>chillphysicsenjoyer.substack.com</author>\n      <description/>\n    </item>\n    <item>\n      <title>OpenCode Browse</title>\n      <link>https://opencode.ai/product/browse</link>\n      <pubDate>Tue, 17 Nov 2026 12:43:12 +0000</pubDate>\n      <author>opencode.ai</author>\n      <description/>\n    </item>\n    <item>\n      <title>Frame – 31.5\" color ePaper display</title>\n      <link>https://trmnl.com/blog/introducing-frame</link>\n      <pubDate>Tue, 17 Nov 2026 12:43:07 +0000</pubDate>\n      <author>trmnl.com</author>\n      <description/>\n    </item>\n    <item>\n      <title>Jiff 1.0: A datetime library for Rust</title>\n      <link>https://burntsushi.net/jiff/</link>\n      <pubDate>Tue, 17 Nov 2026 12:43:02 +0000</pubDate>\n      <author>burntsushi.net</author>\n      <description/>\n    </item>\n    <item>\n      <title>Comcast's \"fiber-powered Wi-Fi\" is cable, AT&amp;amp;T says in false advertising case</title>\n      <link>https://arstechnica.com/tech-policy/2026/11/comcast-falsely-advertises-cable-internet-as-fiber-powered-att-lawsuit-says/</link>\n      <pubDate>Tue, 17 Nov 2026 12:42:57 +0000</pubDate>\n      <author>arstechnica.com</author>\n      <description/>\n    </item>\n    <item>\n      <title>What is w2rt6byl5nf1opmc-a.com?</title>\n      <link>https://jack.cab/blog/siterate</link>\n      <pubDate>Tue, 17 Nov 2026 12:42:52 +0000</pubDate>\n      <author>jack.cab</author>\n      <description/>\n    </item>\n    <item>\n      <title>The Fossils That Haunted Lovecraft</title>\n      <link>https://paleonerdish.wordpress.com/2026/10/30/halloween-special-xiv-the-fossils-that-haunted-lovecraft/</link>\n      <pubDate>Tue, 17 Nov 2026 12:42:47 +0000</pubDate>\n      <author>paleonerdish.wordpress.com</author>\n      <description/>\n    </item>\n    <item>\n      <title>Microsoft blames monster email outage on software defect introduced in July fix</title>\n      <link>https://www.theregister.com/saas/2026/11/16/microsoft-blames-monster-email-outage-on-software-defect-introduced-in-july-fix/5310026</link>\n      <pubDate>Tue, 17 Nov 2026 12:42:42 +0000</pubDate>\n      <author>theregister.com</author>\n      <description/>\n    </item>\n    <item>\n      <title>Grazing sheep in fields with solar arrays</title>\n      <link>https://news.cornell.edu/stories/2026/10/sheep-grazing-solar-fields-offers-farmers-economic-ecological-gains</link>\n      <pubDate>Tue, 17 Nov 2026 12:42:37 +0000</pubDate>\n      <author>cornell.edu</author>\n      <description/>\n    </item>\n    <item>\n      <title>Test/verification technique effectiveness with Astra</title>\n      <link>https://danluu.com/astra-testing/</link>\n      <pubDate>Tue, 17 Nov 2026 12:42:32 +0000</pubDate>\n      <author>danluu.com</author>\n      <description/>\n    </item>\n    <item>\n      <title>Stop Filming in Log?</title>\n      <link>https://digitalfilms.wordpress.com/2026/11/15/stop-filming-in-log/</link>\n      <pubDate>Tue, 17 Nov 2026 12:42:27 +0000</pubDate>\n      <author>digitalfilms.wordpress.com</author>\n      <description/>\n    </item>\n    <item>\n      <title>Formal Verification Is Not Verifiable</title>\n      <link>https://alperenkeles.com/posts/formal-verification-is-not-verifiable/</link>\n      <pubDate>Tue, 17 Nov 2026 12:42:22 +0000</pubDate>\n      <author>alperenkeles.com</author>\n      <description/>\n    </item>\n    <item>\n      <title>Do Repeat Yourself</title>\n      <link>https://arcentry.com/blog/do-repeat-yourself/</link>\n      <pubDate>Tue, 17 Nov 2026 12:42:17 +0000</pubDate>\n      <author>arcentry.com</author>\n      <description/>\n    </item>\n    <item>\n      <title>Launch HN: Axonnic (YC F26) – Sleeves that track fingers and estimate force</title>\n      <link>https://news.ycombinator.com/item?id=50522776</link>\n      <pubDate>Tue, 17 Nov 2026 12:42:12 +0000</pubDate>\n      <description/>\n    </item>\n    <item>\n      <title>Squircles</title>\n      <link>https://linebender.org/wiki/curves/squircle/</link>\n      <pubDate>Tue, 17 Nov 2026 12:42:07 +0000</pubDate>\n      <author>linebender.org</author>\n      <description/>\n    </item>\n    <item>\n      <title>Windows 11 is collecting data on which coding agents and developer tools you use</title>\n      <link>https://xusheng.dev/posts/windows-coding-agent-telemetry/</link>\n      <pubDate>Tue, 17 Nov 2026 12:42:02 +0000</pubDate>\n      <author>xusheng.dev</author>\n      <description/>\n    </item>\n    <item>\n      <title>Technical issue at JPMorgan Chase triggers online banking delays for US banks</title>\n      <link>https://apnews.com/article/bank-outage-chase-wells-fargo-truist-50fee2693c22f597fa6ca51a97ef2cda</link>\n      <pubDate>Tue, 17 Nov 2026 12:41:57 +0000</pubDate>\n      <author>apnews.com</author>\n      <description/>\n    </item>\n    <item>\n      <title>Spamhaus new email sender requirements in November</title>\n      <link>https://www.spamhaus.org/sender-guidelines/</link>\n      <pubDate>Tue, 17 Nov 2026 12:41:52 +0000</pubDate>\n      <author>spamhaus.org</author>\n      <description/>\n    </item>\n  </channel>\n</rss>",
+   "content_type": "application/rss+xml",
+   "count": 30,
+   "error": null,
+   "seconds": 2.7
+  },
+  "feeds/news/lobsters/feed.yaml": {
+   "output": "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<rss xmlns:atom=\"http://www.w3.org/2005/Atom\" xmlns:content=\"http://purl.org/rss/1.0/modules/content/\" version=\"2.0\" xml:base=\"https://lobste.rs/\">\n  <channel>\n    <title>Lobsters</title>\n    <link>https://lobste.rs/</link>\n    <description/>\n    <atom:link href=\"https://feeds.example.com/feed/lobsters\" rel=\"self\" type=\"application/rss+xml\"/>\n    <pubDate>Tue, 17 Nov 2026 12:44:25 +0000</pubDate>\n    <lastBuildDate>Tue, 17 Nov 2026 12:44:25 +0000</lastBuildDate>\n    <item>\n      <title>Redict is deprecated</title>\n      <link>https://redict.io/posts/2026-11-17-redict-deprecated/</link>\n      <pubDate>Tue, 17 Nov 2026 12:44:19 +0000</pubDate>\n      <author>val</author>\n      <category>databases</category>\n      <description/>\n    </item>\n    <item>\n      <title>How Rust Changed Me As A Developer</title>\n      <link>https://blog.startifact.com/posts/how-rust-changed-me/</link>\n      <pubDate>Tue, 17 Nov 2026 12:44:14 +0000</pubDate>\n      <author>faassen</author>\n      <category>performance</category>\n      <category>rust</category>\n      <description/>\n    </item>\n    <item>\n      <title>Github Redesign (2019)</title>\n      <link>https://tonsky.me/blog/github-redesign/</link>\n      <pubDate>Tue, 17 Nov 2026 12:44:09 +0000</pubDate>\n      <author>decentstates</author>\n      <category>design</category>\n      <description/>\n    </item>\n    <item>\n      <title>What is w2rt6byl5nf1opmc-a[.]com?</title>\n      <link>https://jack.cab/blog/siterate.html</link>\n      <pubDate>Tue, 17 Nov 2026 12:44:04 +0000</pubDate>\n      <author>robalex</author>\n      <category>web</category>\n      <description/>\n    </item>\n    <item>\n      <title>On Leaving Swift for Rust</title>\n      <link>https://www.prux.org/posts/goodbye-swift-hello-rust/</link>\n      <pubDate>Tue, 17 Nov 2026 12:43:59 +0000</pubDate>\n      <author>marcprux</author>\n      <category>mobile</category>\n      <category>rust</category>\n      <category>swift</category>\n      <description/>\n    </item>\n    <item>\n      <title>Migrating from GitHub to Codeberg</title>\n      <link>https://yorickpeterse.com/articles/migrating-from-github-to-codeberg/</link>\n      <pubDate>Tue, 17 Nov 2026 12:43:54 +0000</pubDate>\n      <author>yorickpeterse</author>\n      <category>programming</category>\n      <category>vcs</category>\n      <description/>\n    </item>\n    <item>\n      <title>Janet Reno was talking about my friend Coolio (computer criminal)</title>\n      <link>https://michael.bacarella.com/2026/11/16/janet-reno-vs-my-friend-coolio/</link>\n      <pubDate>Tue, 17 Nov 2026 12:43:49 +0000</pubDate>\n      <author>scanner_brightly</author>\n      <category>culture</category>\n      <category>security</category>\n      <description/>\n    </item>\n    <item>\n      <title>Improving the Wii U's Wii Mode</title>\n      <link>https://garyodernichts.blogspot.com/2026/11/improving-wii-us-wii-mode.html</link>\n      <pubDate>Tue, 17 Nov 2026 12:43:44 +0000</pubDate>\n      <author>calvin</author>\n      <category>graphics</category>\n      <category>hardware</category>\n      <category>reversing</category>\n      <description/>\n    </item>\n    <item>\n      <title>Squircles</title>\n      <link>https://linebender.org/wiki/curves/squircle/</link>\n      <pubDate>Tue, 17 Nov 2026 12:43:39 +0000</pubDate>\n      <author>pushcx</author>\n      <category>graphics</category>\n      <description/>\n    </item>\n    <item>\n      <title>My Emacs 31 contributions</title>\n      <link>https://xenodium.com/my-emacs-31-contributions</link>\n      <pubDate>Tue, 17 Nov 2026 12:43:34 +0000</pubDate>\n      <author>nomnp</author>\n      <category>emacs</category>\n      <description/>\n    </item>\n    <item>\n      <title>A datetime library for Rust</title>\n      <link>https://burntsushi.net/jiff/</link>\n      <pubDate>Tue, 17 Nov 2026 12:43:29 +0000</pubDate>\n      <author>refi64</author>\n      <category>rust</category>\n      <description/>\n    </item>\n    <item>\n      <title>Quality IMAP, Part 1: Your Mailbox Is A Database</title>\n      <link>https://aerogramme.deuxfleurs.fr/blog/2026-quality-imap-part-1/</link>\n      <pubDate>Tue, 17 Nov 2026 12:43:24 +0000</pubDate>\n      <author>gasche</author>\n      <category>email</category>\n      <category>testing</category>\n      <description/>\n    </item>\n    <item>\n      <title>Enabling the parallel frontend on nightly</title>\n      <link>https://blog.rust-lang.org/2026/11/16/enabling-parallel-frontend-on-nightly/</link>\n      <pubDate>Tue, 17 Nov 2026 12:43:19 +0000</pubDate>\n      <author>fanf</author>\n      <category>rust</category>\n      <description/>\n    </item>\n    <item>\n      <title>Software is breaking down at a systemic level</title>\n      <link>https://www.breck-mckye.com/blog/2026/11/software-is-breaking-down-at-a-systemic-level/</link>\n      <pubDate>Tue, 17 Nov 2026 12:43:14 +0000</pubDate>\n      <author>whymarrh</author>\n      <category>culture</category>\n      <description/>\n    </item>\n    <item>\n      <title>\"Proof of use\" as a requirement for open source contributions?</title>\n      <link>https://lobste.rs/s/ki1l5r/proof_use_as_requirement_for_open_source</link>\n      <pubDate>Tue, 17 Nov 2026 12:43:09 +0000</pubDate>\n      <author>twp</author>\n      <category>ask</category>\n      <category>ai</category>\n      <category>culture</category>\n      <description/>\n    </item>\n    <item>\n      <title>Paint in the memory of other programs</title>\n      <link>https://citrons.xyz/journal/2026-04-13</link>\n      <pubDate>Tue, 17 Nov 2026 12:43:04 +0000</pubDate>\n      <author>gavinmorrow</author>\n      <category>programming</category>\n      <category>visualization</category>\n      <description/>\n    </item>\n    <item>\n      <title>Safe Systems-programming with Mutable Value Semantics | Dave Abrahams</title>\n      <link>https://www.youtube.com/watch?v=op51SyyPJmw</link>\n      <pubDate>Tue, 17 Nov 2026 12:42:59 +0000</pubDate>\n      <author>trousers</author>\n      <category>video</category>\n      <category>programming</category>\n      <description/>\n    </item>\n    <item>\n      <title>you won't win at copyright</title>\n      <link>https://ingrids.space/posts/you-wont-win-at-copyright/</link>\n      <pubDate>Tue, 17 Nov 2026 12:42:54 +0000</pubDate>\n      <author>sjamaan</author>\n      <category>culture</category>\n      <category>law</category>\n      <category>philosophy</category>\n      <description/>\n    </item>\n    <item>\n      <title>Where did the ACK go?</title>\n      <link>https://yashgarg.dev/posts/where-did-the-ack-go/</link>\n      <pubDate>Tue, 17 Nov 2026 12:42:49 +0000</pubDate>\n      <author>yashgarg</author>\n      <category>networking</category>\n      <category>reversing</category>\n      <description/>\n    </item>\n    <item>\n      <title>What are you doing this week?</title>\n      <link>https://lobste.rs/s/isejqv/what_are_you_doing_this_week</link>\n      <pubDate>Tue, 17 Nov 2026 12:42:44 +0000</pubDate>\n      <author>caius</author>\n      <category>ask</category>\n      <category>programming</category>\n      <description/>\n    </item>\n    <item>\n      <title>NoisyTCP</title>\n      <link>https://www.openwall.com/lists/oss-security/2026/11/15/2</link>\n      <pubDate>Tue, 17 Nov 2026 12:42:39 +0000</pubDate>\n      <author>hanno</author>\n      <category>linux</category>\n      <category>security</category>\n      <description/>\n    </item>\n    <item>\n      <title>Universal XSS in uBlock Origin from website-driven element picker</title>\n      <link>https://iter.ca/post/ubo-uxss/</link>\n      <pubDate>Tue, 17 Nov 2026 12:42:34 +0000</pubDate>\n      <author>pgr0ss</author>\n      <category>browsers</category>\n      <category>security</category>\n      <category>web</category>\n      <description/>\n    </item>\n    <item>\n      <title>Pixels on a screen</title>\n      <link>https://whitebeard.blog/posts/pixels-on-a-screen/</link>\n      <pubDate>Tue, 17 Nov 2026 12:42:29 +0000</pubDate>\n      <author>nbaksalyar</author>\n      <category>graphics</category>\n      <category>plt</category>\n      <description/>\n    </item>\n    <item>\n      <title>Programming a language</title>\n      <link>https://nrinaudo.github.io/articles/pl.html</link>\n      <pubDate>Tue, 17 Nov 2026 12:42:24 +0000</pubDate>\n      <author>abhin4v</author>\n      <category>plt</category>\n      <description/>\n    </item>\n    <item>\n      <title>Announcing Hegel-clj</title>\n      <link>https://aphyr.com/posts/428-announcing-hegel-clj</link>\n      <pubDate>Tue, 17 Nov 2026 12:42:19 +0000</pubDate>\n      <author>abhin4v</author>\n      <category>clojure</category>\n      <category>release</category>\n      <category>testing</category>\n      <description/>\n    </item>\n  </channel>\n</rss>",
+   "content_type": "application/rss+xml",
+   "count": 25,
+   "error": null,
+   "seconds": 2.5
+  },
+  "feeds/browser/x-orbital-lab/feed.yaml": {
+   "output": "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<rss xmlns:atom=\"http://www.w3.org/2005/Atom\" xmlns:content=\"http://purl.org/rss/1.0/modules/content/\" version=\"2.0\" xml:base=\"https://gchristensen.github.io/feedxcavator/demo/sites/x.html\">\n  <channel>\n    <title>X: Orbital Lab</title>\n    <link>https://gchristensen.github.io/feedxcavator/demo/sites/x.html</link>\n    <description/>\n    <atom:link href=\"https://feeds.example.com/feed/x-orbital-lab\" rel=\"self\" type=\"application/rss+xml\"/>\n    <pubDate>Tue, 17 Nov 2026 12:44:31 +0000</pubDate>\n    <lastBuildDate>Tue, 17 Nov 2026 12:44:31 +0000</lastBuildDate>\n    <item>\n      <title>The Kestrel-2 cubesat sent its first full image set overnight. The coastline shots are sharper than we hoped.</title>\n      <link>https://gchristensen.github.io/feedxcavator/demo/sites/orbitallab/status/1900000</link>\n      <pubDate>Tue, 17 Nov 2026 10:44:29 +0000</pubDate>\n      <description>The Kestrel-2 cubesat sent its first full image set overnight. The coastline shots are sharper than we hoped.</description>\n      <enclosure length=\"0\" type=\"image/svg+xml\" url=\"https://gchristensen.github.io/feedxcavator/demo/sites/img/thumb-1.svg\"/>\n    </item>\n    <item>\n      <title>Reminder: the open lab day is this Saturday. Bring questions, we bring the thermal vacuum chamber.</title>\n      <link>https://gchristensen.github.io/feedxcavator/demo/sites/orbitallab/status/1900001</link>\n      <pubDate>Tue, 17 Nov 2026 05:44:29 +0000</pubDate>\n      <description>Reminder: the open lab day is this Saturday. Bring questions, we bring the thermal vacuum chamber.</description>\n    </item>\n    <item>\n      <title>Our student team finished the parachute drop tests: 14 out of 15 clean deployments. The 15th is now a lesson.</title>\n      <link>https://gchristensen.github.io/feedxcavator/demo/sites/orbitallab/status/1900002</link>\n      <pubDate>Tue, 17 Nov 2026 00:44:29 +0000</pubDate>\n      <description>Our student team finished the parachute drop tests: 14 out of 15 clean deployments. The 15th is now a lesson.</description>\n      <enclosure length=\"0\" type=\"image/svg+xml\" url=\"https://gchristensen.github.io/feedxcavator/demo/sites/img/thumb-2.svg\"/>\n    </item>\n    <item>\n      <title>New paper: measuring micrometeoroid wear on solar panel coatings after 400 days in low orbit.</title>\n      <link>https://gchristensen.github.io/feedxcavator/demo/sites/orbitallab/status/1900003</link>\n      <pubDate>Mon, 16 Nov 2026 19:44:29 +0000</pubDate>\n      <description>New paper: measuring micrometeoroid wear on solar panel coatings after 400 days in low orbit.</description>\n    </item>\n    <item>\n      <title>The ground station antenna is back online after the storm. Thanks to everyone who stayed late.</title>\n      <link>https://gchristensen.github.io/feedxcavator/demo/sites/orbitallab/status/1900004</link>\n      <pubDate>Mon, 16 Nov 2026 14:44:29 +0000</pubDate>\n      <description>The ground station antenna is back online after the storm. Thanks to everyone who stayed late.</description>\n      <enclosure length=\"0\" type=\"image/svg+xml\" url=\"https://gchristensen.github.io/feedxcavator/demo/sites/img/thumb-3.svg\"/>\n    </item>\n    <item>\n      <title>Kestrel-2 passes over the lab at 21:40 tonight. It is too small to see, but we will wave anyway.</title>\n      <link>https://gchristensen.github.io/feedxcavator/demo/sites/orbitallab/status/1900005</link>\n      <pubDate>Mon, 16 Nov 2026 09:44:29 +0000</pubDate>\n      <description>Kestrel-2 passes over the lab at 21:40 tonight. It is too small to see, but we will wave anyway.</description>\n    </item>\n    <item>\n      <title>Battery health after 1,000 charge cycles: 93%. Engineering is quietly very pleased.</title>\n      <link>https://gchristensen.github.io/feedxcavator/demo/sites/orbitallab/status/1900006</link>\n      <pubDate>Mon, 16 Nov 2026 04:44:29 +0000</pubDate>\n      <description>Battery health after 1,000 charge cycles: 93%. Engineering is quietly very pleased.</description>\n    </item>\n    <item>\n      <title>We are hiring two firmware engineers who enjoy radiation-tolerant code and bad puns.</title>\n      <link>https://gchristensen.github.io/feedxcavator/demo/sites/orbitallab/status/1900007</link>\n      <pubDate>Sun, 15 Nov 2026 23:44:29 +0000</pubDate>\n      <description>We are hiring two firmware engineers who enjoy radiation-tolerant code and bad puns.</description>\n    </item>\n    <item>\n      <title>Clean room tour, part 3: why everything here is wrapped in foil (it is not for the snacks).</title>\n      <link>https://gchristensen.github.io/feedxcavator/demo/sites/orbitallab/status/1900008</link>\n      <pubDate>Sun, 15 Nov 2026 18:44:29 +0000</pubDate>\n      <description>Clean room tour, part 3: why everything here is wrapped in foil (it is not for the snacks).</description>\n      <enclosure length=\"0\" type=\"image/svg+xml\" url=\"https://gchristensen.github.io/feedxcavator/demo/sites/img/thumb-1.svg\"/>\n    </item>\n    <item>\n      <title>Kestrel-3 has a name, a frame and a very long checklist. Integration starts next month.</title>\n      <link>https://gchristensen.github.io/feedxcavator/demo/sites/orbitallab/status/1900009</link>\n      <pubDate>Sun, 15 Nov 2026 13:44:29 +0000</pubDate>\n      <description>Kestrel-3 has a name, a frame and a very long checklist. Integration starts next month.</description>\n      <enclosure length=\"0\" type=\"image/svg+xml\" url=\"https://gchristensen.github.io/feedxcavator/demo/sites/img/thumb-2.svg\"/>\n    </item>\n    <item>\n      <title>Throwback to the first prototype, held together with zip ties and optimism.</title>\n      <link>https://gchristensen.github.io/feedxcavator/demo/sites/orbitallab/status/1900010</link>\n      <pubDate>Sun, 15 Nov 2026 08:44:30 +0000</pubDate>\n      <description>Throwback to the first prototype, held together with zip ties and optimism.</description>\n    </item>\n    <item>\n      <title>Our orbit simulator is now open source. Pull requests welcome, orbital decay not included.</title>\n      <link>https://gchristensen.github.io/feedxcavator/demo/sites/orbitallab/status/1900011</link>\n      <pubDate>Sun, 15 Nov 2026 03:44:30 +0000</pubDate>\n      <description>Our orbit simulator is now open source. Pull requests welcome, orbital decay not included.</description>\n    </item>\n    <item>\n      <title>Telemetry dashboard update: you can now see the cubesat temperature in Kelvin, Celsius or \"warm-ish\".</title>\n      <link>https://gchristensen.github.io/feedxcavator/demo/sites/orbitallab/status/1900012</link>\n      <pubDate>Sat, 14 Nov 2026 22:44:30 +0000</pubDate>\n      <description>Telemetry dashboard update: you can now see the cubesat temperature in Kelvin, Celsius or \"warm-ish\".</description>\n    </item>\n    <item>\n      <title>The deployment springs passed the cold soak at -40 °C. Next up: the shaker table.</title>\n      <link>https://gchristensen.github.io/feedxcavator/demo/sites/orbitallab/status/1900013</link>\n      <pubDate>Sat, 14 Nov 2026 17:44:30 +0000</pubDate>\n      <description>The deployment springs passed the cold soak at -40 °C. Next up: the shaker table.</description>\n      <enclosure length=\"0\" type=\"image/svg+xml\" url=\"https://gchristensen.github.io/feedxcavator/demo/sites/img/thumb-3.svg\"/>\n    </item>\n    <item>\n      <title>Thank you for 10,000 followers. Every one of you is now an honorary member of mission control.</title>\n      <link>https://gchristensen.github.io/feedxcavator/demo/sites/orbitallab/status/1900014</link>\n      <pubDate>Sat, 14 Nov 2026 12:44:30 +0000</pubDate>\n      <description>Thank you for 10,000 followers. Every one of you is now an honorary member of mission control.</description>\n    </item>\n  </channel>\n</rss>",
+   "content_type": "application/rss+xml",
+   "count": 15,
+   "error": null,
+   "seconds": 5.5
+  },
+  "feeds/browser/youtube-orbital-lab/feed.yaml": {
+   "output": "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<rss xmlns:atom=\"http://www.w3.org/2005/Atom\" xmlns:content=\"http://purl.org/rss/1.0/modules/content/\" version=\"2.0\" xml:base=\"https://gchristensen.github.io/feedxcavator/demo/sites/youtube.html\">\n  <channel>\n    <title>YouTube: Orbital Lab</title>\n    <link>https://gchristensen.github.io/feedxcavator/demo/sites/youtube.html</link>\n    <description/>\n    <atom:link href=\"https://feeds.example.com/feed/youtube-orbital-lab\" rel=\"self\" type=\"application/rss+xml\"/>\n    <pubDate>Tue, 17 Nov 2026 12:44:35 +0000</pubDate>\n    <lastBuildDate>Tue, 17 Nov 2026 12:44:35 +0000</lastBuildDate>\n    <item>\n      <title>Kestrel-2: the first week in orbit</title>\n      <link>https://gchristensen.github.io/feedxcavator/demo/sites/watch?v=olab0001</link>\n      <pubDate>Tue, 17 Nov 2026 12:44:29 +0000</pubDate>\n      <description>12K views · 2 days ago</description>\n      <enclosure length=\"0\" type=\"image/svg+xml\" url=\"https://gchristensen.github.io/feedxcavator/demo/sites/img/thumb-1.svg\"/>\n    </item>\n    <item>\n      <title>Inside the thermal vacuum chamber</title>\n      <link>https://gchristensen.github.io/feedxcavator/demo/sites/watch?v=olab0002</link>\n      <pubDate>Tue, 17 Nov 2026 12:44:24 +0000</pubDate>\n      <description>8.4K views · 5 days ago</description>\n      <enclosure length=\"0\" type=\"image/svg+xml\" url=\"https://gchristensen.github.io/feedxcavator/demo/sites/img/thumb-2.svg\"/>\n    </item>\n    <item>\n      <title>Parachute drop tests, all 15 of them</title>\n      <link>https://gchristensen.github.io/feedxcavator/demo/sites/watch?v=olab0003</link>\n      <pubDate>Tue, 17 Nov 2026 12:44:19 +0000</pubDate>\n      <description>21K views · 1 week ago</description>\n      <enclosure length=\"0\" type=\"image/svg+xml\" url=\"https://gchristensen.github.io/feedxcavator/demo/sites/img/thumb-3.svg\"/>\n    </item>\n    <item>\n      <title>How we talk to a satellite the size of a shoebox</title>\n      <link>https://gchristensen.github.io/feedxcavator/demo/sites/watch?v=olab0004</link>\n      <pubDate>Tue, 17 Nov 2026 12:44:14 +0000</pubDate>\n      <description>33K views · 2 weeks ago</description>\n      <enclosure length=\"0\" type=\"image/svg+xml\" url=\"https://gchristensen.github.io/feedxcavator/demo/sites/img/thumb-1.svg\"/>\n    </item>\n    <item>\n      <title>Clean room tour, part 3</title>\n      <link>https://gchristensen.github.io/feedxcavator/demo/sites/watch?v=olab0005</link>\n      <pubDate>Tue, 17 Nov 2026 12:44:09 +0000</pubDate>\n      <description>6.1K views · 3 weeks ago</description>\n      <enclosure length=\"0\" type=\"image/svg+xml\" url=\"https://gchristensen.github.io/feedxcavator/demo/sites/img/thumb-2.svg\"/>\n    </item>\n    <item>\n      <title>Building the ground station antenna</title>\n      <link>https://gchristensen.github.io/feedxcavator/demo/sites/watch?v=olab0006</link>\n      <pubDate>Tue, 17 Nov 2026 12:44:04 +0000</pubDate>\n      <description>15K views · 1 month ago</description>\n      <enclosure length=\"0\" type=\"image/svg+xml\" url=\"https://gchristensen.github.io/feedxcavator/demo/sites/img/thumb-3.svg\"/>\n    </item>\n    <item>\n      <title>Shaker table day: will the springs survive?</title>\n      <link>https://gchristensen.github.io/feedxcavator/demo/sites/watch?v=olab0007</link>\n      <pubDate>Tue, 17 Nov 2026 12:43:59 +0000</pubDate>\n      <description>9.9K views · 1 month ago</description>\n      <enclosure length=\"0\" type=\"image/svg+xml\" url=\"https://gchristensen.github.io/feedxcavator/demo/sites/img/thumb-1.svg\"/>\n    </item>\n    <item>\n      <title>Q&amp;A with the mission control team</title>\n      <link>https://gchristensen.github.io/feedxcavator/demo/sites/watch?v=olab0008</link>\n      <pubDate>Tue, 17 Nov 2026 12:43:54 +0000</pubDate>\n      <description>4.3K views · 2 months ago</description>\n      <enclosure length=\"0\" type=\"image/svg+xml\" url=\"https://gchristensen.github.io/feedxcavator/demo/sites/img/thumb-2.svg\"/>\n    </item>\n  </channel>\n</rss>",
+   "content_type": "application/rss+xml",
+   "count": 8,
+   "error": null,
+   "seconds": 4.6
+  }
+ },
+ "scratch": {
+  "output": "Kestrel-2: the first week in orbit\nInside the thermal vacuum chamber\nParachute drop tests, all 15 of them\nHow we talk to a satellite the size of a shoebox\nClean room tour, part 3\nBuilding the ground station antenna\nShaker table day: will the springs survive?\nQ&A with the mission control team\n",
+  "error": null
+ },
+ "tasks": [
+  {
+   "name": "browser",
+   "declared": true,
+   "feeds": 2,
+   "run": [],
+   "then": [],
+   "pre": [],
+   "post": [],
+   "call": null,
+   "concurrency": "skip",
+   "timeout": 600.0,
+   "error": null
+  },
+  {
+   "name": "morning",
+   "declared": true,
+   "feeds": 4,
+   "run": [
+    "news",
+    "browser"
+   ],
+   "then": [],
+   "pre": [],
+   "post": [],
+   "call": null,
+   "concurrency": "skip",
+   "timeout": null,
+   "error": null
+  },
+  {
+   "name": "news",
+   "declared": true,
+   "feeds": 2,
+   "run": [],
+   "then": [],
+   "pre": [],
+   "post": [],
+   "call": null,
+   "concurrency": "skip",
+   "timeout": null,
+   "error": null
+  }
+ ],
+ "tasks_table": {
+  "tasks": [
+   {
+    "name": "news",
+    "declared": true,
+    "tags": [],
+    "path": [],
+    "list": [],
+    "run": [],
+    "then": [],
+    "pre": [],
+    "post": [],
+    "call": "",
+    "concurrency": "skip",
+    "timeout": "",
+    "post_timeout": "",
+    "feeds": 2,
+    "schedules": 1,
+    "error": null,
+    "last_status": null,
+    "last_started_at": null
+   },
+   {
+    "name": "browser",
+    "declared": true,
+    "tags": [],
+    "path": [],
+    "list": [],
+    "run": [],
+    "then": [],
+    "pre": [],
+    "post": [],
+    "call": "",
+    "concurrency": "skip",
+    "timeout": "600",
+    "post_timeout": "",
+    "feeds": 2,
+    "schedules": 0,
+    "error": null,
+    "last_status": null,
+    "last_started_at": null
+   },
+   {
+    "name": "morning",
+    "declared": true,
+    "tags": [],
+    "path": [],
+    "list": [],
+    "run": [
+     "news",
+     "browser"
+    ],
+    "then": [],
+    "pre": [],
+    "post": [],
+    "call": "",
+    "concurrency": "skip",
+    "timeout": "",
+    "post_timeout": "",
+    "feeds": 4,
+    "schedules": 1,
+    "error": null,
+    "last_status": "ok",
+    "last_started_at": "2026-11-17T12:45:16.582105+00:00"
+   }
+  ],
+  "errors": [],
+  "functions": [],
+  "mtime": 1794917597.2260203
+ },
+ "schedules": {
+  "schedules": [
+   {
+    "index": 0,
+    "task": "morning",
+    "cron": "15 7 * * *",
+    "description": "At 07:15",
+    "timezone": null,
+    "effective_timezone": "Asia/Dubai",
+    "misfire": "skip",
+    "enabled": true,
+    "jitter": 0,
+    "next": [
+     "2026-11-18T07:15:00+04:00"
+    ],
+    "last_fired_at": null,
+    "last_status": "ok"
+   },
+   {
+    "index": 1,
+    "task": "news",
+    "cron": "0 */2 * * *",
+    "description": "Every 2 hours",
+    "timezone": null,
+    "effective_timezone": "Asia/Dubai",
+    "misfire": "skip",
+    "enabled": true,
+    "jitter": 0,
+    "next": [
+     "2026-11-17T18:00:00+04:00"
+    ],
+    "last_fired_at": null,
+    "last_status": null
+   }
+  ],
+  "errors": [],
+  "tasks": [
+   "browser",
+   "morning",
+   "news"
+  ],
+  "mtime": 1794917597.2694592
+ },
+ "wordfilters": [
+  {
+   "name": "noise",
+   "count": 2,
+   "feeds": [
+    {
+     "title": "Hacker News",
+     "dir": "feeds/news/hacker-news"
+    },
+    {
+     "title": "Lobsters",
+     "dir": "feeds/news/lobsters"
+    }
+   ],
+   "exists": true
+  }
+ ],
+ "wordfilter_texts": {
+  "noise": "sponsored\n/(?i)^ask hn: who is hiring/\n"
+ },
+ "runs": [
+  {
+   "id": 10,
+   "task": "morning",
+   "trigger": "manual",
+   "status": "ok",
+   "error": "",
+   "started_at": "2026-11-17T12:45:16.582105+00:00",
+   "duration": 6.663203,
+   "feed_runs": [],
+   "children": [
+    {
+     "id": 11,
+     "task": "news",
+     "trigger": "subtask",
+     "status": "ok",
+     "error": "",
+     "started_at": "2026-11-17T12:45:16.583244+00:00",
+     "duration": 0.600366,
+     "feed_runs": [
+      {
+       "feed_id": "hacker-news",
+       "title": "Hacker News",
+       "status": "ok",
+       "headline_count": 30,
+       "http_status": null,
+       "error": "",
+       "duration": 0.598339,
+       "zero": false
+      },
+      {
+       "feed_id": "lobsters",
+       "title": "Lobsters",
+       "status": "ok",
+       "headline_count": 25,
+       "http_status": null,
+       "error": "",
+       "duration": 0.531327,
+       "zero": false
+      }
+     ],
+     "children": []
+    },
+    {
+     "id": 12,
+     "task": "browser",
+     "trigger": "subtask",
+     "status": "ok",
+     "error": "",
+     "started_at": "2026-11-17T12:45:16.583514+00:00",
+     "duration": 6.659441,
+     "feed_runs": [
+      {
+       "feed_id": "x-orbital-lab",
+       "title": "X: Orbital Lab",
+       "status": "ok",
+       "headline_count": 15,
+       "http_status": null,
+       "error": "",
+       "duration": 3.945689,
+       "zero": false
+      },
+      {
+       "feed_id": "youtube-orbital-lab",
+       "title": "YouTube: Orbital Lab",
+       "status": "ok",
+       "headline_count": 8,
+       "http_status": null,
+       "error": "",
+       "duration": 6.656581,
+       "zero": false
+      }
+     ],
+     "children": []
+    }
+   ]
+  }
+ ],
+ "log": [],
+ "reference": {
+  "sections": [
+   {
+    "category": "Registration",
+    "entries": [
+     {
+      "name": "extractor",
+      "hy": "extractor",
+      "signature": "(name)",
+      "doc": "@extractor(\"name\"): registers an extractor, a function of a feed that returns headlines.\nFeeds refer to it with `extractor: name`. A feed directory that defines exactly one extractor\nuses it without naming it."
+     },
+     {
+      "name": "handler",
+      "hy": "handler",
+      "signature": "(name, auth=False)",
+      "doc": "@handler(\"name\", auth=False): registers an HTTP handler at /handler/<name>. The function\nreceives the request parameters named by its arguments, or the whole request when its only\nargument is called `request`. With auth=True the x-feedxcavator-auth header must carry the API token."
+     },
+     {
+      "name": "task_function",
+      "hy": "task-function",
+      "signature": "(name)",
+      "doc": "@task_function(\"name\"): registers a function for `call`, `pre` and `post` in tasks.yaml.\n`pre` and `post` functions receive the task context (task, trigger, feeds, results)."
+     },
+     {
+      "name": "proxy",
+      "hy": "proxy",
+      "signature": "(name, host=None, port=None, user=None, password=None, scheme='http')",
+      "doc": "proxy(\"name\", host=, port=, user=, password=, scheme=\"http\"): defines a proxy that feeds\n(`fetch.proxy`) and fetch_url (`proxy=`) refer to by name."
+     }
+    ]
+   },
+   {
+    "category": "Fetching",
+    "entries": [
+     {
+      "name": "fetch_url",
+      "hy": "fetch-url",
+      "signature": "(url, **options)",
+      "doc": "Fetches a URL. Never raises on network or HTTP errors: returns None and records the failure,\nreadable through get_last_http_error() and the other accessors.\n\nOptions: method, headers, payload, `as` (html, xml, json, string, bytes; without it the raw response\nis returned), charset, timeout (milliseconds), proxy (a proxy name, False for a direct connection),\nfollow_redirects, retry (False or a number of retries, default 2), `async` (fire and forget),\ninsecure (skip TLS checks), impersonate (curl_cffi browser profile), cookies.\nIn Python pass `as` and `async` as `as_` and `async_`."
+     },
+     {
+      "name": "get_last_http_response",
+      "hy": "get-last-http-response",
+      "signature": "()",
+      "doc": "The response of the last failed fetch_url call in this request or job."
+     },
+     {
+      "name": "get_last_http_error",
+      "hy": "get-last-http-error",
+      "signature": "()",
+      "doc": "The HTTP status of the last failed fetch_url call, or None."
+     },
+     {
+      "name": "get_last_network_error",
+      "hy": "get-last-network-error",
+      "signature": "()",
+      "doc": "The exception of the last fetch_url call that failed on the network level, or None."
+     },
+     {
+      "name": "get_last_conversion_error",
+      "hy": "get-last-conversion-error",
+      "signature": "()",
+      "doc": "The error raised while converting the last response (`as`), or None."
+     },
+     {
+      "name": "log_fetch_errors",
+      "hy": "log-fetch-errors",
+      "signature": "()",
+      "doc": "A context manager: every failed fetch inside it writes an error entry to the application log."
+     },
+     {
+      "name": "browser",
+      "hy": "browser",
+      "signature": "(profile='default', proxy=None)",
+      "doc": "with browser(profile=\"default\", proxy=None) as b: takes a stealth browser from the worker's pool for the\nblock; in Hy, (with-browser [b :profile \"default\" :proxy \"name\"] body...). `profile` names the persistent data\ndirectory data/browser/<profile>/ (cookies, logins); one profile is open in one browser at a time. `proxy`\nnames a proxy (defproxy, or `proxies` in config.yml) the browser connects through. The browser starts at the\nbeginning of the block and closes at its end, with its pages. In the web process (the console) the calls go\nto the worker over RPC. The methods of `b` and of the pages it opens are listed in the Browser section."
+     },
+     {
+      "name": "solve_captcha",
+      "hy": "solve-captcha",
+      "signature": "(url, profile='default', timeout=60, watch=10, proxy=None)",
+      "doc": "(solve-captcha url :profile \"default\" :proxy None): opens `url` in a pool browser and passes a Cloudflare\nchallenge there with the system mouse, so later visits with the profile (and fetch_url calls to the host) get\nthrough. Clearance is bound to the address the challenge came from: solve it through the proxy the site is\ncrawled through.\nA challenge may show up some time after the page opens: `watch` is how long to wait for one. True when the\npage is through. In an open browser, page.solve_captcha(watch=...) does the same on that page."
+     },
+     {
+      "name": "load_js",
+      "hy": "load-js",
+      "signature": "(name, wrap=True)",
+      "doc": "(load-js \"cards\"): a script for page.evaluate() from a file in the directory of the workspace file that\ncalls it. \".js\" is added to a name without a suffix. The file defines `function main()` (or\n`async function main(arg)`); evaluate() returns what main returns, and `(.evaluate page js arg)` passes\n`arg` to main. The file runs in a function scope of its own, so its names do not leak into the page. Names\nit sets on `window` persist between calls on the same page. `:wrap False` returns the file as is. The file is read at\neach call, so edits apply without a workspace reload (the workspace does not watch .js files)."
+     }
+    ]
+   },
+   {
+    "category": "Selectors",
+    "entries": [
+     {
+      "name": "q",
+      "hy": "q",
+      "signature": "(node, selector: 'str') -> 'list'",
+      "doc": "All matches of a selector: elements, or strings for `::text`, `::attr()` and text XPath results."
+     },
+     {
+      "name": "q1",
+      "hy": "q1",
+      "signature": "(node, selector: 'str')",
+      "doc": "The first match of a selector, or None."
+     },
+     {
+      "name": "text",
+      "hy": "text",
+      "signature": "(node) -> 'str | None'",
+      "doc": "Text content of an element (or of an HTML string), stripped."
+     },
+     {
+      "name": "attr",
+      "hy": "attr",
+      "signature": "(node, name: 'str') -> 'str | None'",
+      "doc": "Value of an attribute of an element."
+     },
+     {
+      "name": "inner_html",
+      "hy": "inner-html",
+      "signature": "(node) -> 'str | None'",
+      "doc": "Inner HTML of an element, or None when it is blank."
+     },
+     {
+      "name": "outer_html",
+      "hy": "outer-html",
+      "signature": "(node) -> 'str | None'",
+      "doc": "Outer HTML of an element."
+     },
+     {
+      "name": "extract",
+      "hy": "extract",
+      "signature": "(node, base_url=None, text_mode=False, **parts) -> 'dict | None'",
+      "doc": "Builds one headline from an item node. Each keyword is a part name with its selector, evaluated\nby the rules of the YAML `selectors` block."
+     },
+     {
+      "name": "apply_selectors",
+      "hy": "apply-selectors",
+      "signature": "(doc, feed=None, base_url=None, text_mode=False) -> 'list | None'",
+      "doc": "Applies the `selectors` of a feed (the current one by default) to a document and returns the\nheadlines, as the built-in extractor does. Returns None when the feed has no `item` selector."
+     },
+     {
+      "name": "parse_html",
+      "hy": "str->html",
+      "signature": "(s)",
+      "doc": "Parses an HTML string into a selector tree."
+     },
+     {
+      "name": "html_render",
+      "hy": "html-render",
+      "signature": "(nodes)",
+      "doc": "Outer HTML of a node or a list of nodes."
+     },
+     {
+      "name": "html_unescape",
+      "hy": "html-unescape",
+      "signature": "(s)",
+      "doc": "Replaces HTML entities with their characters."
+     },
+     {
+      "name": "html_sanitize",
+      "hy": "html-sanitize",
+      "signature": "(s)",
+      "doc": "Escapes <, >, \", ' and & for inclusion in HTML."
+     },
+     {
+      "name": "html_untag",
+      "hy": "html-untag",
+      "signature": "(s)",
+      "doc": "Removes HTML tags, keeping the text."
+     },
+     {
+      "name": "parse_date",
+      "hy": "parse-date",
+      "signature": "(value) -> 'datetime | None'",
+      "doc": "Parses a date in almost any format into a timezone-aware datetime."
+     }
+    ]
+   },
+   {
+    "category": "Extraction",
+    "entries": [
+     {
+      "name": "parse_html_page",
+      "hy": "parse-html-page",
+      "signature": "(feed, url=None, useragent=None)",
+      "doc": "Fetches a page (the feed source by default) and applies the feed selectors to it.\nReturns the headlines, or None when the page cannot be fetched."
+     },
+     {
+      "name": "parse_pages",
+      "hy": "parse-pages",
+      "signature": "(feed, path, n_pages, include_source=True, increment=1, parser=None, delay=None, useragent=None)",
+      "doc": "Reads `n_pages` pages: the source and then pages 2..n, or pages 1..n without the source."
+     },
+     {
+      "name": "parse_page_range",
+      "hy": "parse-page-range",
+      "signature": "(feed, path, start, end, include_source=True, increment=1, parser=None, delay=None, useragent=None, source=None)",
+      "doc": "Reads several pages and concatenates their headlines (FD-16, FD-17). `path` is a template\nappended to the source, with `{n}` (or `%n`) replaced by the page number, or a function of it."
+     },
+     {
+      "name": "fetch_document",
+      "hy": "fetch-document",
+      "signature": "(feed, url, useragent=None)",
+      "doc": "Fetches a source of a feed with its `fetch` options and parses it: a parsel selector for HTML\nand XML, parsed JSON when the item selector is JMESPath. Returns None on failure."
+     },
+     {
+      "name": "default_feed_parser",
+      "hy": "default-feed-parser",
+      "signature": "(feed)",
+      "doc": "The body of the built-in extractor: fetches every source (and its pages) and applies the\nselectors, or the automatic extraction with `mode: auto`. Returns None when nothing could be read."
+     },
+     {
+      "name": "produce_feed_output",
+      "hy": "produce-feed-output",
+      "signature": "(feed, headlines) -> 'dict'",
+      "doc": "Serializes headlines in the output format of the feed.\nReturns {\"output\": text, \"content_type\": type}."
+     },
+     {
+      "name": "xml_format",
+      "hy": "xml-format",
+      "signature": "(xml: 'str | None') -> 'str | None'",
+      "doc": "Pretty-prints an XML document."
+     }
+    ]
+   },
+   {
+    "category": "Filtering",
+    "entries": [
+     {
+      "name": "filter_history",
+      "hy": "filter-history",
+      "signature": "(feed_or_key, headlines, key='link')",
+      "doc": "Drops headlines whose key (the link by default) is in the history. Does not change the history."
+     },
+     {
+      "name": "filter_history_update",
+      "hy": "filter-history!",
+      "signature": "(feed_or_key, headlines, key='link', keep=None, keep_days=None)",
+      "doc": "Drops headlines whose key is in the history, then records the keys of all given headlines.\nThe history keeps the last `keep` keys (default 1000), or those seen in the last `keep_days` days.\nAvailable in Hy as `filter-history!`."
+     },
+     {
+      "name": "filter_history_by_guid_update",
+      "hy": "filter-history-by-guid!",
+      "signature": "(feed_or_key, headlines, keep=None, keep_days=None)",
+      "doc": "As filter_history_update, keyed by `guid`. Available in Hy as `filter-history-by-guid!`."
+     },
+     {
+      "name": "filter_content",
+      "hy": "filter-content",
+      "signature": "(feed, headlines, name=None, fields=None)",
+      "doc": "Drops headlines whose fields match a word filter. Without arguments the filter and the fields\ncome from the `wordfilter` step of the feed."
+     },
+     {
+      "name": "filter_headlines",
+      "hy": "filter-headlines",
+      "signature": "(feed, headlines, testing=None)",
+      "doc": "Runs the `filter` steps of a feed in order. A console test skips the history steps (FD-20)."
+     },
+     {
+      "name": "add_filter_word",
+      "hy": "add-filter-word",
+      "signature": "(*args)",
+      "doc": "add_filter_word([word_filter,] word): adds a plain word to a word filter (`default` by default)."
+     },
+     {
+      "name": "remove_filter_word",
+      "hy": "remove-filter-word",
+      "signature": "(*args)",
+      "doc": "remove_filter_word([word_filter,] word)"
+     },
+     {
+      "name": "add_filter_regex",
+      "hy": "add-filter-regex",
+      "signature": "(*args)",
+      "doc": "add_filter_regex([word_filter,] expr): adds a case-insensitive regular expression to a word filter."
+     },
+     {
+      "name": "remove_filter_regex",
+      "hy": "remove-filter-regex",
+      "signature": "(*args)",
+      "doc": "remove_filter_regex([word_filter,] expr)"
+     },
+     {
+      "name": "list_word_filter",
+      "hy": "list-word-filter",
+      "signature": "(name='default') -> 'list[str]'",
+      "doc": "Entries of a word filter. Regular expressions are returned as their source text (WF-2)."
+     }
+    ]
+   },
+   {
+    "category": "URLs",
+    "entries": [
+     {
+      "name": "fix_relative_url",
+      "hy": "fix-relative-url",
+      "signature": "(url, base)",
+      "doc": "Makes a link absolute against the source URL (FD-13). Protocol-relative URLs take the scheme of\nthe source (SEL-6)."
+     },
+     {
+      "name": "redirect_url",
+      "hy": "redirect-url",
+      "signature": "(url)",
+      "doc": "A link to this server that redirects to `url`."
+     },
+     {
+      "name": "redirect_url_b64",
+      "hy": "redirect-url-b64",
+      "signature": "(url)",
+      "doc": "As redirect_url, with the target Base64-encoded so it is not visible in the link."
+     },
+     {
+      "name": "forward_url",
+      "hy": "forward-url",
+      "signature": "(url, referer, https=False, proxy=None)",
+      "doc": "A link to this server that fetches `url` with the given Referer (and proxy) and returns the\nresult. Used for media that needs a specific referer."
+     },
+     {
+      "name": "forward_url_b64",
+      "hy": "forward-url-b64",
+      "signature": "(url, referer, https=False, proxy=None)",
+      "doc": "As forward_url, with the target and referer Base64-encoded."
+     },
+     {
+      "name": "get_feed_url",
+      "hy": "get-feed-url",
+      "signature": "(feed)",
+      "doc": "The public URL of a feed."
+     },
+     {
+      "name": "get_app_host",
+      "hy": "get-app-host",
+      "signature": "()",
+      "doc": "The base URL of the server: the host of the current request, or `hostname` of the configuration."
+     },
+     {
+      "name": "url_encode_utf8",
+      "hy": "url-encode-utf8",
+      "signature": "(s)",
+      "doc": "Percent-encodes a string for use in a URL."
+     },
+     {
+      "name": "base64enc",
+      "hy": "base64enc",
+      "signature": "(s)",
+      "doc": "Base64 of a string."
+     },
+     {
+      "name": "base64dec",
+      "hy": "base64dec",
+      "signature": "(s)",
+      "doc": "Decodes Base64 to a string."
+     },
+     {
+      "name": "base64dec_bytes",
+      "hy": "base64dec->bytes",
+      "signature": "(s)",
+      "doc": "Decodes Base64 to bytes."
+     },
+     {
+      "name": "url_safe_base64enc",
+      "hy": "url-safe-base64enc",
+      "signature": "(s)",
+      "doc": "URL-safe Base64 of a string, without padding."
+     },
+     {
+      "name": "url_safe_base64dec",
+      "hy": "url-safe-base64dec",
+      "signature": "(s)",
+      "doc": "Decodes URL-safe Base64 to a string."
+     }
+    ]
+   },
+   {
+    "category": "Utilities",
+    "entries": [
+     {
+      "name": "md5",
+      "hy": "md5",
+      "signature": "(s)",
+      "doc": "Hex MD5 of a string."
+     },
+     {
+      "name": "sha256",
+      "hy": "sha256",
+      "signature": "(s)",
+      "doc": "Hex SHA-256 of a string."
+     },
+     {
+      "name": "sha1_sign",
+      "hy": "sha1-sign",
+      "signature": "(data, key)",
+      "doc": "Hex HMAC-SHA1 of `data` signed with `key`."
+     },
+     {
+      "name": "generate_uuid",
+      "hy": "generate-uuid",
+      "signature": "()",
+      "doc": "A new UUID: 32 lowercase hex characters."
+     },
+     {
+      "name": "generate_random",
+      "hy": "generate-random",
+      "signature": "(byte_length)",
+      "doc": "A random hex string of `byte_length` bytes."
+     },
+     {
+      "name": "to_hex_string",
+      "hy": "to-hex-string",
+      "signature": "(data)",
+      "doc": "Hex representation of bytes."
+     },
+     {
+      "name": "timestamp",
+      "hy": "timestamp",
+      "signature": "()",
+      "doc": "The current time in milliseconds."
+     },
+     {
+      "name": "regex_escape",
+      "hy": "regex-escape",
+      "signature": "(s)",
+      "doc": "Escapes a string for use in a regular expression."
+     },
+     {
+      "name": "pprint",
+      "hy": "pprint",
+      "signature": "(value)",
+      "doc": "Pretty-prints a value."
+     },
+     {
+      "name": "find_header",
+      "hy": "find-header",
+      "signature": "(response, header)",
+      "doc": "Value of a response header, case-insensitively."
+     },
+     {
+      "name": "safe_call",
+      "hy": "safe-call",
+      "signature": "(fn, *args, **kwargs)",
+      "doc": "Calls a function and returns its result, or None (printing the traceback) when it raises."
+     },
+     {
+      "name": "safely_repeat",
+      "hy": "safely-repeat",
+      "signature": "(fn, times=2)",
+      "doc": "Calls a function up to `times` times until it does not raise. Returns None when all attempts fail."
+     }
+    ]
+   },
+   {
+    "category": "Collections",
+    "entries": [
+     {
+      "name": "assoc",
+      "hy": "assoc",
+      "signature": "(coll, *kvs)",
+      "doc": "(assoc m k v ...): a copy of a dict (or list) with the keys set."
+     },
+     {
+      "name": "dissoc",
+      "hy": "dissoc",
+      "signature": "(m, *keys)",
+      "doc": "(dissoc m k ...): a copy of a dict without the keys."
+     },
+     {
+      "name": "update",
+      "hy": "update",
+      "signature": "(m, key, f, *args)",
+      "doc": "(update m k f & args): a copy of a dict with the value of k replaced by (f old & args)."
+     },
+     {
+      "name": "get_in",
+      "hy": "get-in",
+      "signature": "(m, keys, default=None)",
+      "doc": "(get-in m [k1 k2 ...]): the value at a path of keys, or the default."
+     },
+     {
+      "name": "assoc_in",
+      "hy": "assoc-in",
+      "signature": "(m, keys, value)",
+      "doc": "(assoc-in m [k1 k2 ...] v): a copy with the value at a path of keys set."
+     },
+     {
+      "name": "update_in",
+      "hy": "update-in",
+      "signature": "(m, keys, f, *args)",
+      "doc": "(update-in m [k1 k2 ...] f & args): a copy with the value at a path replaced by (f old & args)."
+     },
+     {
+      "name": "merge",
+      "hy": "merge",
+      "signature": "(*maps)",
+      "doc": "(merge m1 m2 ...): a new dict with the keys of all, later ones winning."
+     },
+     {
+      "name": "select_keys",
+      "hy": "select-keys",
+      "signature": "(m, keys)",
+      "doc": "(select-keys m [k ...]): a dict with only the given keys."
+     },
+     {
+      "name": "distinct_by",
+      "hy": "distinct-by",
+      "signature": "(f, coll)",
+      "doc": "(distinct-by f coll): the items with a distinct (f item), keeping the first of each."
+     },
+     {
+      "name": "keep",
+      "hy": "keep",
+      "signature": "(f, coll)",
+      "doc": "(keep f coll): the non-None results of (f item)."
+     },
+     {
+      "name": "mapcat",
+      "hy": "mapcat",
+      "signature": "(f, *colls)",
+      "doc": "(mapcat f coll): the concatenation of the results of (f item)."
+     },
+     {
+      "name": "partition",
+      "hy": "partition",
+      "signature": "(n, coll, step=None)",
+      "doc": "(partition n coll): lists of n items each. An incomplete last part is dropped."
+     },
+     {
+      "name": "partition_all",
+      "hy": "partition-all",
+      "signature": "(n, coll)",
+      "doc": "(partition-all n coll): lists of n items each, the last one possibly shorter."
+     },
+     {
+      "name": "group_by",
+      "hy": "group-by",
+      "signature": "(f, coll)",
+      "doc": "(group-by f coll): a dict from (f item) to the list of items."
+     },
+     {
+      "name": "frequencies",
+      "hy": "frequencies",
+      "signature": "(coll)",
+      "doc": "(frequencies coll): a dict from each distinct item to its count."
+     }
+    ]
+   },
+   {
+    "category": "Responses",
+    "entries": [
+     {
+      "name": "text_page",
+      "hy": "text-page",
+      "signature": "(body)",
+      "doc": "A plain text response."
+     },
+     {
+      "name": "html_page",
+      "hy": "html-page",
+      "signature": "(body)",
+      "doc": "An HTML response."
+     },
+     {
+      "name": "json_page",
+      "hy": "json-page",
+      "signature": "(body)",
+      "doc": "A JSON response. Accepts JSON text or any JSON-serializable value."
+     },
+     {
+      "name": "rss_page",
+      "hy": "rss-page",
+      "signature": "(body)",
+      "doc": "An RSS response."
+     },
+     {
+      "name": "web_page",
+      "hy": "web-page",
+      "signature": "(content_type, body)",
+      "doc": "A 200 response with the given content type."
+     },
+     {
+      "name": "attachment_page",
+      "hy": "attachment-page",
+      "signature": "(filename, body)",
+      "doc": "A response the browser saves as a file."
+     },
+     {
+      "name": "redirect_to",
+      "hy": "redirect-to",
+      "signature": "(location)",
+      "doc": "A 302 redirect."
+     },
+     {
+      "name": "no_content",
+      "hy": "no-content",
+      "signature": "()",
+      "doc": "A 204 response."
+     },
+     {
+      "name": "permission_denied",
+      "hy": "permission-denied",
+      "signature": "()",
+      "doc": "A 403 response."
+     },
+     {
+      "name": "page_not_found",
+      "hy": "page-not-found",
+      "signature": "()",
+      "doc": "A 404 response."
+     },
+     {
+      "name": "internal_server_error",
+      "hy": "internal-server-error",
+      "signature": "(message=None)",
+      "doc": "A 500 response."
+     }
+    ]
+   },
+   {
+    "category": "Storage",
+    "entries": [
+     {
+      "name": "store_object",
+      "hy": "store-object!",
+      "signature": "(key: 'str', value, namespace: 'str' = 'default', ttl: 'float | None' = None)",
+      "doc": "Stores a JSON-serializable value under a string key. `ttl` is a lifetime in seconds."
+     },
+     {
+      "name": "fetch_object",
+      "hy": "fetch-object",
+      "signature": "(key: 'str', default=None, namespace: 'str' = 'default')",
+      "doc": "Returns the value stored under the key, or `default`."
+     },
+     {
+      "name": "delete_object",
+      "hy": "delete-object!",
+      "signature": "(key: 'str', namespace: 'str' = 'default')",
+      "doc": "Deletes the value stored under the key."
+     },
+     {
+      "name": "find_feed",
+      "hy": "find-feed",
+      "signature": "(suffix_or_title)",
+      "doc": "Finds a feed by suffix, then by title."
+     },
+     {
+      "name": "fetch_feed_output",
+      "hy": "fetch-feed-output",
+      "signature": "(feed)",
+      "doc": "The stored output of a background feed: {\"output\", \"content_type\"}, or None."
+     },
+     {
+      "name": "store_feed_output",
+      "hy": "store-feed-output!",
+      "signature": "(feed, result)",
+      "doc": "Stores output (the result of produce_feed_output) for a feed."
+     },
+     {
+      "name": "store_image",
+      "hy": "store-image",
+      "signature": "(data, content_type='image/jpeg', source_url='')",
+      "doc": "Stores bytes in the blob store and returns the URL they are served at (/image/<id>)."
+     }
+    ]
+   },
+   {
+    "category": "Logging",
+    "entries": [
+     {
+      "name": "log.write",
+      "hy": "log.write",
+      "signature": "(*args)",
+      "doc": "write(message) or write(level, message). Level is `info` (default), `warning` or `error`.\n\nA string is stored as is, an exception as its traceback, any other value pretty-printed."
+     }
+    ]
+   },
+   {
+    "category": "Telegram",
+    "entries": [
+     {
+      "name": "telegram.get_channel_messages",
+      "hy": "telegram.get-channel-messages",
+      "signature": "(channel, limit=26, proxy=None)",
+      "doc": "Headlines for the most recent messages of a public Telegram channel (up to 26). The call goes\nthrough the proxy named by `proxy` (False for a direct connection), otherwise the feed's\n`fetch.proxy`, otherwise the proxy named `default` when `telegram.default-proxy` is on."
+     },
+     {
+      "name": "telegram.notify",
+      "hy": "telegram.notify",
+      "signature": "(message, chat_id, proxy=None)",
+      "doc": "Sends a Telegram text message to a chat. The proxy is chosen as for `get_channel_messages`."
+     }
+    ]
+   },
+   {
+    "category": "Browser",
+    "intro": "`b` is the browser bound by the block, and `page` is what b.open(url) returns:\n\n    with browser() as b:\n        page = b.open(feed[\"source\"], wait_for=\"article\")\n        headlines = page.apply_selectors(feed)\n\n    (with-browser [b]\n      (setv page (.open b (:source feed) :wait-for \"article\"))\n      (.apply-selectors page feed))\n\nEach b.open opens another page; page.goto navigates the same page and returns it. Pages and the browser close\nat the end of the block, so take what you need from a page inside it.",
+    "entries": [
+     {
+      "name": "b.open(url, wait_for=None, scroll=0, timeout=30) -> Page",
+      "hy": "(.open b ...)",
+      "signature": "",
+      "doc": "Opens `url` in a new page and returns it. `wait_for` is a CSS selector to wait for after the DOM\nloads, `scroll` a number of scrolls to the bottom (for infinite lists), `timeout` the limit in seconds\nfor the navigation and for `wait_for`. Raises BrowserError when the page does not load. Later fetch_url\ncalls to the host reuse the browser's cookies and user agent."
+     },
+     {
+      "name": "b.cookies(url=None) -> dict",
+      "hy": "(.cookies b ...)",
+      "signature": "",
+      "doc": "The cookies of the browser profile as a {name: value} dict, only those sent to `url` when given."
+     },
+     {
+      "name": "b.user_agent",
+      "hy": "(. b user-agent)",
+      "signature": "",
+      "doc": "The browser's user agent string (a property: `b.user_agent`)."
+     },
+     {
+      "name": "page.html() -> str",
+      "hy": "(.html page)",
+      "signature": "",
+      "doc": "The HTML of the live DOM."
+     },
+     {
+      "name": "page.url",
+      "hy": "(. page url)",
+      "signature": "",
+      "doc": "The current URL of the page, after redirects and navigations (a property: `page.url`, `(. page url)`\nin Hy)."
+     },
+     {
+      "name": "page.selector()",
+      "hy": "(.selector page)",
+      "signature": "",
+      "doc": "The live DOM as a parsel selector."
+     },
+     {
+      "name": "page.apply_selectors(feed=None)",
+      "hy": "(.apply-selectors page ...)",
+      "signature": "",
+      "doc": "Applies the feed selectors to the live DOM. Parts are text content where the built-in\nextractor gives inner HTML (INT-1)."
+     },
+     {
+      "name": "page.goto(url, wait_for=None, timeout=30)",
+      "hy": "(.goto page ...)",
+      "signature": "",
+      "doc": "Navigates the page to `url` and waits for the DOM to load, then for `wait_for` (a CSS selector) when\ngiven. `timeout` is in seconds. Returns the page, so calls chain. Later fetch_url calls to the host reuse\nthe browser's cookies and user agent."
+     },
+     {
+      "name": "page.click(selector, timeout=30)",
+      "hy": "(.click page ...)",
+      "signature": "",
+      "doc": "Clicks the first element matching `selector` (CSS, or a Playwright selector such as \"text=More\"),\nwaiting up to `timeout` seconds for it to be visible and enabled. The click is made by the driver, which\nsome bot checks ignore (see solve_captcha)."
+     },
+     {
+      "name": "page.fill(selector, value, timeout=30)",
+      "hy": "(.fill page ...)",
+      "signature": "",
+      "doc": "Replaces the value of the input or textarea matching `selector` with `value`, waiting up to `timeout`\nseconds for the element."
+     },
+     {
+      "name": "page.press(selector, key)",
+      "hy": "(.press page ...)",
+      "signature": "",
+      "doc": "Focuses the element matching `selector` and presses `key`: a key name such as \"Enter\", \"ArrowDown\"\nor \"Control+A\", or a single character."
+     },
+     {
+      "name": "page.wait_for(selector, timeout=30, required=True) -> bool",
+      "hy": "(.wait-for page ...)",
+      "signature": "",
+      "doc": "Waits for an element matching `selector`, through navigations (such as the reload a security check\ndoes once passed). On a timeout it raises, or with `required=False` returns False."
+     },
+     {
+      "name": "page.wait(seconds)",
+      "hy": "(.wait page ...)",
+      "signature": "",
+      "doc": "Pauses for `seconds` with the page live (scripts keep running). Prefer wait_for when there is an\nelement to wait for."
+     },
+     {
+      "name": "page.scroll(times=1)",
+      "hy": "(.scroll page ...)",
+      "signature": "",
+      "doc": "Scrolls to the bottom of the page `times` times, 0.8 seconds apart, so infinite lists load more\nitems."
+     },
+     {
+      "name": "page.evaluate(script, arg=None)",
+      "hy": "(.evaluate page ...)",
+      "signature": "",
+      "doc": "Runs a JavaScript expression in the page and returns its value. When the expression is a function,\nit is called with `arg` (JSON-like data)."
+     },
+     {
+      "name": "page.screenshot(selector=None, type='png', quality=None, style=None, timeout=30) -> bytes",
+      "hy": "(.screenshot page ...)",
+      "signature": "",
+      "doc": "The first element matching `selector`, or the viewport without one, as image bytes. Playwright\nscrolls the element into view first. `type` is \"png\" or \"jpeg\" (with `quality` 0-100); `style` is CSS\napplied only while the shot is taken, for example to hide fixed headers lying over the element."
+     },
+     {
+      "name": "page.solve_captcha(timeout=60, attempts=2, watch=0) -> bool",
+      "hy": "(.solve-captcha page ...)",
+      "signature": "",
+      "doc": "BRW-8: passes a Cloudflare challenge on the page with the system mouse, if there is one. True when\nthe page is through. `watch` is how many seconds to keep looking for a challenge that has not shown yet\n(it returns as soon as one does). Needs a headful browser, pyautogui and the display the browser is on."
+     },
+     {
+      "name": "page.text(selector=None)",
+      "hy": "(.text page ...)",
+      "signature": "",
+      "doc": "The text content of the first element matching `selector` (None when nothing matches), or of the\nwhole document without one."
+     },
+     {
+      "name": "page.close()",
+      "hy": "(.close page)",
+      "signature": "",
+      "doc": "Closes the page. Pages left open are closed with the browser at the end of the `with` block."
+     }
+    ]
+   },
+   {
+    "category": "Hy macros",
+    "entries": [
+     {
+      "name": "(defextractor name [feed] body...)",
+      "hy": "(defextractor name [feed] body...)",
+      "signature": "",
+      "doc": "Defines and registers an extractor (see `extractor`)."
+     },
+     {
+      "name": "(defhandler name [a b] body...)",
+      "hy": "(defhandler name [a b] body...)",
+      "signature": "",
+      "doc": "Defines and registers a handler. `(defhandler ^:auth name [a b] ...)` requires the API token. `(defhandler name request ...)` receives the whole request."
+     },
+     {
+      "name": "(defproxy name :host ... :port ... :user ... :password ...)",
+      "hy": "(defproxy name :host ... :port ... :user ... :password ...)",
+      "signature": "",
+      "doc": "Defines a proxy."
+     },
+     {
+      "name": "(deftaskfn name [ctx] body...)",
+      "hy": "(deftaskfn name [ctx] body...)",
+      "signature": "",
+      "doc": "Defines and registers a task function for tasks.yaml."
+     },
+     {
+      "name": "(with-browser [b :profile \"default\" :proxy \"name\"] body...)",
+      "hy": "(with-browser [b :profile \"default\" :proxy \"name\"] body...)",
+      "signature": "",
+      "doc": "Runs the body with a browser from the worker's pool bound to `b` (see `browser`). Both options are optional; (with-browser body...) binds `b` with the defaults. The methods are in the Browser section."
+     },
+     {
+      "name": "(log-fetch-errors body...)",
+      "hy": "(log-fetch-errors body...)",
+      "signature": "",
+      "doc": "Every failed fetch inside the body writes an error to the log."
+     },
+     {
+      "name": "(safe-call form)",
+      "hy": "(safe-call form)",
+      "signature": "",
+      "doc": "Evaluates the form; on an exception prints the traceback and returns None."
+     },
+     {
+      "name": "(safely-repeat form)",
+      "hy": "(safely-repeat form)",
+      "signature": "",
+      "doc": "Evaluates the form, once more if it raises. `safely-repeat3` tries three times."
+     },
+     {
+      "name": "($ node \"selector\")",
+      "hy": "($ node \"selector\")",
+      "signature": "",
+      "doc": "All matches of a selector. A literal selector is checked when the file loads. Also accepts an Enlive-style vector: ($ page [:div.post :> :a])."
+     },
+     {
+      "name": "($1 node \"selector\")",
+      "hy": "($1 node \"selector\")",
+      "signature": "",
+      "doc": "The first match of a selector, or None."
+     },
+     {
+      "name": "(defselectors name :item \"...\" :title \"...\" ...)",
+      "hy": "(defselectors name :item \"...\" :title \"...\" ...)",
+      "signature": "",
+      "doc": "Defines a reusable selector set; (name doc) returns headlines."
+     },
+     {
+      "name": "-> ->> as-> some-> cond-> doto",
+      "hy": "-> ->> as-> some-> cond-> doto",
+      "signature": "",
+      "doc": "Threading macros."
+     },
+     {
+      "name": "(:key m)",
+      "hy": "(:key m)",
+      "signature": "",
+      "doc": "Keyword lookup on dicts, feeds and headlines; returns None for a missing key."
+     }
+    ]
+   }
+  ],
+  "version": "4.0.0"
+ },
+ "manual": {
+  "html": "<h1 id=\"feedxcavator-manual\">Feedxcavator manual</h1>\n<p>This manual goes from a first feed written in a few lines of YAML to feeds written in code, background tasks,\nbrowsers and custom HTTP handlers. </p>\n<h2 id=\"how-feedxcavator-works\">How Feedxcavator works</h2>\n<p>A <em>feed</em> is a directory under <code>workspace/feeds/</code> with a <code>feed.yaml</code> file in it. The definition names a source\n(a web page, a JSON API, another feed) and says how to find headlines in it. The server serves the result at\n<code>/feed/&lt;suffix&gt;</code>, where the suffix is the directory name unless the definition sets another.</p>\n<p>A feed is extracted in one of two ways:</p>\n<ul>\n<li>On request. Each visit to the feed URL fetches the source and builds the feed again. This is the default and\n  suits feeds that are quick to build.</li>\n<li>In the background. A feed that belongs to a <em>task</em> is extracted when the task runs, on a schedule or by hand.\n  The result is stored, served to everyone who visits the URL, and pushed to WebSub subscribers.</li>\n</ul>\n<p>Everything you write lives as plain files in the workspace: feed definitions, Python and Hy code, task and\nschedule files. You can edit them in the web console, in an IDE, or keep them under git. The server notices\nchanges to the files and reloads the workspace.</p>\n<h2 id=\"the-console\">The console</h2>\n<p>The console is at <code>http://&lt;host&gt;:10000/console</code>. Its tabs:</p>\n<table>\n<thead>\n<tr>\n<th>Tab</th>\n<th>What it is for</th>\n</tr>\n</thead>\n<tbody>\n<tr>\n<td>Workspace</td>\n<td>the file tree, the editor and the output pane; feeds are created, tested and debugged here</td>\n</tr>\n<tr>\n<td>Tasks</td>\n<td>background tasks, their feeds, and Run now</td>\n</tr>\n<tr>\n<td>Schedules</td>\n<td>when tasks run; Run now</td>\n</tr>\n<tr>\n<td>Runs</td>\n<td>the history of task and feed runs, with durations, headline counts and results</td>\n</tr>\n<tr>\n<td>Subscriptions</td>\n<td>WebSub subscriptions: their feeds, callbacks, status and expiry</td>\n</tr>\n<tr>\n<td>Word filters</td>\n<td>lists of words and regular expressions that remove headlines</td>\n</tr>\n<tr>\n<td>Log</td>\n<td>messages written by the server and by your code</td>\n</tr>\n<tr>\n<td>Settings</td>\n<td>the API token, the subscription URL, backup and restore, purging stored images, restart</td>\n</tr>\n<tr>\n<td>API</td>\n<td>every function of the user library, with Python and Hy names</td>\n</tr>\n<tr>\n<td>Manual</td>\n<td>this text</td>\n</tr>\n</tbody>\n</table>\n<h3 id=\"the-workspace-tab\">The Workspace tab</h3>\n<p>The tree on the left shows the workspace. Right-click a feed for its actions: <strong>Test</strong>, <strong>Open feed URL</strong>,\n<strong>Subscribe</strong>, <strong>Run feed task</strong>, <strong>Suggest selectors</strong>, <strong>New code file</strong>, <strong>Rename folder</strong> and <strong>Delete</strong>.\nRight-click a folder under <code>feeds/</code> for <strong>New feed</strong>, and the empty part of the tree for <strong>Reload workspace</strong>.\nFiles can be dragged to another folder.</p>\n<p>Below the tree, the outline lists what the open file defines: extractors, handlers, functions, tasks. Click an\nentry to jump to it; right-click a task to run it or list its feeds.</p>\n<p>The toolbar above the editor follows the open file. For a <code>feed.yaml</code> it offers <strong>Save</strong>, <strong>Test</strong>, <strong>Suggest\nselectors</strong>, <strong>Open</strong> (the feed URL), <strong>Subscribe</strong> and <strong>Delete</strong>. For <code>scratch.hy</code> it offers <strong>Run</strong>. Ctrl S\nsaves the file, or runs it in the case of the scratch file.</p>\n<p><strong>Test</strong> extracts the feed without publishing it and shows the headlines in the output pane. A test skips the\n<code>history</code> filter steps, so it shows the same headlines every time and does not mark them as seen.</p>\n<p>The header shows whether the workspace loaded. When a file fails to load, it shows the number of errors; click it\nto see them in the output pane. Files with errors are marked in the tree and in the editor tabs.</p>\n<p>Ctrl K (or the search box in the header) opens a feed or a file by name.</p>\n<h2 id=\"your-first-feed\">Your first feed</h2>\n<p>Create the file <code>workspace/feeds/my-first-feed/feed.yaml</code>, or use <strong>New feed</strong> in the console, with this text:</p>\n<pre><code class=\"language-yaml\">title: My first feed\nsource: https://example.com\nselectors:\n  item: article\n  title: h2::text\n  link: h2 a\n  image: img::attr(data-src)||src\npages:\n  include-source: false\n  path: '/page/{n}'\n  start: 1\n  end: 5\n</code></pre>\n<p>The feed is served at <code>http://&lt;host&gt;:10000/feed/my-first-feed</code>. Each time the URL is visited, Feedxcavator reads\nthe pages from https://example.com/page/1 to https://example.com/page/5, finds every element matched by the\n<code>item</code> selector, and builds a headline from each of them with the other selectors, which are applied inside the\nitem.</p>\n<p>A link is taken from the <code>href</code> attribute of the matched element and an image from its <code>src</code> attribute, unless\nthe selector names an attribute. The definition above takes the image from <code>data-src</code>, and from <code>src</code> when\n<code>data-src</code> is absent. Relative links are made absolute against the source URL.</p>\n<p>Before writing selectors by hand, try <strong>Suggest selectors</strong>: it proposes a <code>selectors</code> block for the source page.\nThen press <strong>Test</strong> to see what the feed produces.</p>\n<h2 id=\"selectors\">Selectors</h2>\n<p>Selectors are full CSS as implemented by <a href=\"https://github.com/scrapy/parsel\">parsel</a> and cssselect: any combinator,\nattribute operator, <code>:not()</code>, <code>:nth-child()</code> and so on can be used. Feedxcavator adds a few things at the end of a\nselector:</p>\n<table>\n<thead>\n<tr>\n<th>Selector</th>\n<th>Result</th>\n</tr>\n</thead>\n<tbody>\n<tr>\n<td><code>h2</code></td>\n<td>the inner HTML of the element (for <code>link</code> and <code>image</code>, its <code>href</code> or <code>src</code>)</td>\n</tr>\n<tr>\n<td><code>h2::text</code></td>\n<td>the text of the element, without tags</td>\n</tr>\n<tr>\n<td><code>img::attr(data-src)</code></td>\n<td>the value of an attribute</td>\n</tr>\n<tr>\n<td><code>img::attr(data-src)\\|\\|src</code></td>\n<td>the first non-empty attribute of the list (<code>img::data-src\\|\\|src</code> also works)</td>\n</tr>\n<tr>\n<td><code>:root::attr(data-id)</code></td>\n<td>the item element itself, written as <code>:root</code></td>\n</tr>\n<tr>\n<td><code>xpath://h2/a/@href</code></td>\n<td>an XPath expression</td>\n</tr>\n<tr>\n<td><code>jmes:data.items[*]</code></td>\n<td>a <a href=\"https://jmespath.org/\">JMESPath</a> expression for JSON sources</td>\n</tr>\n</tbody>\n</table>\n<p>When the <code>item</code> selector is a <code>jmes:</code> expression, the source is parsed as JSON, so a JSON API can be turned into a\nfeed without code. XML sources (another RSS feed, for example) are parsed with namespaces removed.</p>\n<p>A selector can also be a map with options:</p>\n<pre><code class=\"language-yaml\">selectors:\n  item: li.post\n  title: {css: 'a::text', strip: true}\n  category: {css: '.tags a::text', many: true}         # a list of all matches\n  published: {css: '.date::text', parse: date}         # almost any date format\n  comments: {css: '.comments::text', parse: int}\n  summary: {xpath: './/p[1]', parse: text}\n  author: {css: '.byline::text', regex: 'by (\\w+)', default: unknown}\n</code></pre>\n<p>Exactly one of <code>css</code>, <code>xpath</code> or <code>jmes</code> is required. <code>regex</code> keeps the first group of the match, or the whole\nmatch when there are no groups. Selectors are checked when the file is saved, and errors are shown with their line\nnumbers.</p>\n<h2 id=\"reading-several-pages\">Reading several pages</h2>\n<p>The <code>pages</code> block reads more than one page of the source. Numbered pages are built by appending <code>path</code>, with <code>{n}</code>\nreplaced by the page number, to the source URL:</p>\n<pre><code class=\"language-yaml\">pages:\n  include-source: true         # also read the URL in `source` itself\n  path: '/?page={n}'\n  start: 2\n  end: 3\n  increment: 1\n  delay: 0                     # seconds between page requests\n</code></pre>\n<p>A site without page numbers can be followed through its \"next\" link instead:</p>\n<pre><code class=\"language-yaml\">pages:\n  next: 'a.next::attr(href)'\n  max: 5\n</code></pre>\n<p><code>source</code> can also be a list of URLs; headlines from all of them go into one feed.</p>\n<h2 id=\"automatic-extraction\">Automatic extraction</h2>\n<p>A feed with <code>mode: auto</code> and no selectors lets Feedxcavator work out the headlines by itself. It looks, in this\norder, for a feed the site already publishes, for structured data on the page (JSON-LD and microdata), and for a\nrepeated structure of elements that looks like a list of articles. OpenGraph data is used last, because it\ndescribes the page itself rather than a list.</p>\n<pre><code class=\"language-yaml\">title: Lazy feed\nsource: https://example.com/blog\nmode: auto\nfulltext: true   # replace each summary with the main text of the linked article\n</code></pre>\n<p><code>fulltext: true</code> works with selectors too. It fetches every linked page, so the feed gets slower with each\nheadline; such feeds are good candidates for background extraction.</p>\n<h2 id=\"filtering-headlines\">Filtering headlines</h2>\n<p>The <code>filter</code> list removes headlines. Its steps run in the order they are written:</p>\n<pre><code class=\"language-yaml\">filter:\n  - history: {key: link, keep: 1000}\n  - dedupe: link\n  - wordfilter: {name: default, fields: [title, summary]}\n  - exclude: {field: title, regex: '^Sponsored'}\n  - limit: 50\n</code></pre>\n<p><code>history</code> drops the headlines that the previous extractions of the feed already returned, so a feed shows only\nnew items. <code>key</code> names the field that identifies a headline (<code>link</code> by default). The history keeps the last\n<code>keep</code> keys (1000 by default), or with <code>keep_days</code> the keys seen in that many days.</p>\n<p><code>dedupe</code> keeps the first of the headlines that have the same value in a field. <code>exclude</code> drops headlines whose\nfield matches a regular expression; the field is <code>title</code> when it is not given. <code>limit</code> keeps the first so many\nheadlines.</p>\n<h3 id=\"word-filters\">Word filters</h3>\n<p>A word filter is a named list of words and regular expressions. The <code>wordfilter</code> step names the filter and the\nfields to check; without a name the filter called <code>default</code> is used, and without fields only the title is\nchecked.</p>\n<p>Filters are edited on the <strong>Word filters</strong> tab, one entry per line. A plain word matches case-insensitively\nanywhere in the field. An entry written as <code>/expr/</code> is a regular expression; a word boundary <code>\\b</code> in it helps to\navoid matching parts of longer words. The tab shows which feeds use each filter.</p>\n<p>Filters can also be changed from code (for example, from <code>scratch.hy</code>) with <code>add_filter_word</code>,\n<code>remove_filter_word</code>, <code>add_filter_regex</code>, <code>remove_filter_regex</code> and <code>list_word_filter</code>:</p>\n<pre><code class=\"language-hy\">(add-filter-regex &quot;default&quot; r&quot;\\bsponsored\\b&quot;)\n</code></pre>\n<p>The same operations are available over HTTP, see <a href=\"#word-filters-over-http\">Word filters over HTTP</a>.</p>\n<h2 id=\"fetch-options-and-output-formats\">Fetch options and output formats</h2>\n<p>The <code>fetch</code> block controls how the source is downloaded:</p>\n<pre><code class=\"language-yaml\">fetch:\n  backend: http                # or browser, for pages that need JavaScript\n  impersonate: chrome          # the browser whose TLS fingerprint and headers are imitated\n  method: GET\n  headers: {Accept-Language: en}\n  cookies: {name: value}\n  charset: auto                # set it when the automatic detection fails\n  proxy: default               # the name of a proxy from proxies in config.yml\n  timeout: 30                  # seconds\n  retry: 2\n  wait_for: article            # browser backend: a CSS selector to wait for\n  scroll: 0                    # browser backend: scroll to the bottom this many times\n</code></pre>\n<p>Requests go through curl_cffi and imitate a real browser. <code>impersonate</code> names the curl_cffi fingerprint (<code>chrome</code>\nby default, also <code>firefox</code>, <code>safari</code> and versioned names such as <code>chrome124</code>). Proxies are described in\n<a href=\"#proxies\">Proxies</a> and the browser backend in <a href=\"#browsers\">Browsers</a>.</p>\n<p><code>output</code> selects the format: <code>rss</code> (the default), <code>atom</code>, <code>json-feed</code> or <code>json</code>. RSS, Atom and JSON Feed carry\nthe standard headline fields; plain JSON keeps every field the headlines have.</p>\n<h2 id=\"feed-definition-reference\">Feed definition reference</h2>\n<p>Every key is optional except <code>source</code> (or an <code>extractor</code> that does not need one). The file the console creates\nfor a new feed lists them all as comments.</p>\n<pre><code class=\"language-yaml\">title: Feed title\nsuffix: feed-suffix            # the feed is served at /feed/feed-suffix; defaults to the directory name\nid: 0123456789abcdef0123456789abcdef  # keeps the stored state when the suffix changes (see &quot;Feed identity&quot;)\nenabled: true\ntags: [news]                   # tasks can select feeds by tag\nextends: forums/phpbb          # inherit from forums/phpbb.yaml in a group lib/ or in lib/; maps are merged\nsource: https://example.com    # a URL or a list of URLs\nmode: selectors                # or auto\nfetch:\n  backend: http\n  # ... see &quot;Fetch options and output formats&quot;\nselectors:\n  item: div.headline           # the container element of a headline\n  title: h3\n  link: a\n  summary: div.preview\n  content: div.body\n  image: div.cover img:first-of-type\n  author: div.user-name\n  category: {css: 'div.category a::text', many: true}\n  published: {css: 'time::attr(datetime)', parse: date}\n  guid: '::attr(data-id)'\npages:\n  # ... see &quot;Reading several pages&quot;\nfilter:\n  # ... see &quot;Filtering headlines&quot;\nfulltext: false                # true: fetch each linked page and use its main text as the summary\ntransform: function-name       # a function applied to every headline\npost_process: function-name    # a function applied to the whole list of headlines\noutput: rss                    # rss, atom, json-feed or json\ntasks: [task-name]             # extract in the background (see &quot;Background extraction&quot;)\nparallel: true                 # false: run on the sequential worker pool\nwebsub: {enabled: true, partition: 100}  # push updates, by parts of 100 items\nexpect_empty: false            # true: zero headlines is normal, no zero-headline log warning or highlight in run history\nextractor: extractor-name      # the code that produces the headlines instead of the selectors\nparams: [any additional data, [123, 456]]  # arbitrary data for the code\n</code></pre>\n<p>Any other top-level key is kept and available to code as a feed field.</p>\n<h2 id=\"organizing-the-workspace\">Organizing the workspace</h2>\n<pre><code>workspace/\n  lib/                     shared code, loaded first (lib/_order.yaml sets an explicit order)\n    forums/phpbb.yaml      a template for `extends: forums/phpbb`\n  feeds/news/\n    lib/                   group library: code and templates for the feeds under news/\n    local/city-paper/\n      feed.yaml            the feed; the directory path is its group, the directory name its default suffix\n      extract.hy           feed-local code\n  handlers/\n  tasks.yaml\n  schedules.yaml\n  scratch.hy               run from the console only\n</code></pre>\n<p>Folders under <code>feeds/</code> group feeds. A task can select all feeds of a group by path, and a group can share code\nand templates.</p>\n<h3 id=\"templates\">Templates</h3>\n<p>Feeds that read similar sites can share their common part. <code>extends: forums/phpbb</code> merges the feed definition\ninto <code>forums/phpbb.yaml</code>: keys of the feed replace keys of the template, and maps (such as <code>selectors</code> or\n<code>fetch</code>) are merged key by key.</p>\n<h3 id=\"group-libraries\">Group libraries</h3>\n<p>A group folder under <code>feeds/</code> may have its own <code>lib/</code> directory. Its code loads before the feeds of the group, and\nthe feeds in the group and in its subgroups can call what it defines; other feeds do not see those names\n(extractors and handlers it registers are global, as always).</p>\n<p>A group library can also hold templates. <code>extends: base</code> looks for <code>base.yaml</code> in the group libraries of the\nfeed, nearest first, then in the workspace <code>lib/</code>. A template can extend a template of the same name further out,\nso <code>feeds/news/lib/base.yaml</code> may start with <code>extends: base</code> to refine <code>lib/base.yaml</code>.</p>\n<h3 id=\"errors-while-loading\">Errors while loading</h3>\n<p>A broken feed file disables only that feed, and a broken group library only the feeds of its group. A broken\n<code>lib/</code> file keeps the previously loaded workspace running. If a <code>lib/</code> file fails at startup, there is no previous\nstate to keep, so the rest of the workspace loads without that file and the error is reported.</p>\n<h3 id=\"feed-identity\">Feed identity</h3>\n<p>A feed is identified by its <code>suffix</code>: it is served at <code>/feed/&lt;suffix&gt;</code>, and its stored output, history,\nsubscriptions and run records are kept under that name. A suffix may contain ASCII letters, digits, <code>.</code>, <code>-</code>, <code>_</code>\nand <code>~</code>, and must be unique regardless of case. Without <code>suffix:</code> the directory name is used, so a directory\nwhose name is not a valid suffix needs an explicit <code>suffix</code>.</p>\n<p>When you change the suffix of a <code>feed.yaml</code> and save it in the console, the stored state moves to the new suffix.\nThe save is refused when another feed already has that suffix. A suffix changed outside the console (in an IDE or\nby git) makes the feed a new one, with empty history.</p>\n<p><code>id:</code> (32 lowercase hex characters) is optional. A feed that sets one keeps its state under the id, so it survives\nany change of suffix or directory, and it is also served at <code>/feed/uuid:&lt;id&gt;</code>. The server never writes ids into\n<code>feed.yaml</code> itself.</p>\n<h2 id=\"background-extraction\">Background extraction</h2>\n<p>A feed without <code>tasks</code> is extracted each time its URL is visited. A feed with <code>tasks</code> is extracted in the\nbackground: the result is stored and served when a user or a feed reader visits the URL, and pushed to WebSub\nsubscribers. This suits feeds that need complex or slow processing.</p>\n<h3 id=\"tasks\">Tasks</h3>\n<p>Tasks are defined in <code>workspace/tasks.yaml</code>, or on the <strong>Tasks</strong> tab. A feed belongs to a task when it lists the\ntask in its <code>tasks</code> field, or when the task selects it by tag, by path or by suffix:</p>\n<pre><code class=\"language-yaml\">tasks:\n  news:\n    feeds: {tags: [news]}\n  forums:\n    feeds: {path: 'forums/*'}\n  papers:\n    feeds: {list: [city-paper, county-paper]}\n  morning-feeds:\n    run: [news, forums]           # subtasks, started together\n    then: [aggregate-feeds]       # tasks started when all subtasks have finished\n  aggregate-feeds:\n    call: aggregate               # a task function defined in code\n</code></pre>\n<p>A task may also name <code>pre</code> and <code>post</code> task functions, which run before and after its feed jobs. <code>timeout</code> limits\nhow long the task may run (written like <code>45s</code>, <code>30m</code> or <code>2h</code>). <code>concurrency</code> says what happens when the task is\ntriggered while it is still running: <code>skip</code> (the default) ignores the trigger, <code>queue</code> runs the task again after\nthe current run, and <code>allow</code> starts another run at once.</p>\n<p>Feeds with <code>parallel: true</code> (the default) run on a pool of parallel workers, the others one at a time on the\nsequential pool. <code>worker-parallel</code> and <code>worker-sequential</code> in <code>config.yml</code> set the sizes of the pools.</p>\n<h3 id=\"schedules\">Schedules</h3>\n<p>Schedules are in <code>workspace/schedules.yaml</code> and are managed on the <strong>Schedules</strong> tab. They use five-field cron\nexpressions in the local time zone unless a <code>timezone</code> is given. A task can be scheduled several times:</p>\n<pre><code class=\"language-yaml\">schedules:\n  - task: news\n    cron: '0 12 * * *'\n  - task: news\n    cron: '0 17 * * *'\n  - task: morning-feeds\n    cron: '0 7 * * *'\n    timezone: Europe/Berlin\n</code></pre>\n<p>A schedule can also set <code>enabled: false</code>, <code>misfire: run-once</code> (run once when a firing was missed while the server\nwas down; the default <code>skip</code> ignores missed firings), and <code>jitter</code>, a random delay of each firing of up to that\nmany seconds.</p>\n<p>A task can be started at any time with <strong>Run now</strong> on the Tasks or Schedules tab, and the tasks of a feed with\n<strong>Run feed task</strong> in its context menu. The <strong>Runs</strong> tab shows what ran, when, and with what result.</p>\n<h3 id=\"websub\">WebSub</h3>\n<p>Feeds announce the built-in WebSub hub at <code>/websub</code> in their <code>hub</code> link. A feed reader that supports WebSub\nsubscribes there, and gets each new version of a background feed as soon as the task has stored it, without\npolling.\n<code>websub: {partition: 100}</code> in a feed sends large updates in parts of 100 items. The <strong>Subscriptions</strong> tab lists the\nsubscriptions; it can also rewrite callback URLs in bulk, for example after the reader moved to another address.</p>\n<p>Set <code>websub: false</code> in <code>config.yml</code> to disable the hub.</p>\n<h2 id=\"writing-code-python-and-hy\">Writing code: Python and Hy</h2>\n<p>When YAML is not enough, write code. Code files sit in the workspace next to the definitions: shared code in\n<code>lib/</code>, feed-specific code in the feed directory, HTTP handlers in <code>handlers/</code>. A <code>.py</code> file is Python and a <code>.hy</code>\nfile is <a href=\"https://hylang.org/\">Hy</a>, a Lisp that compiles to Python. The Hy prelude adds a compact DSL for feed code:\ndefinition macros such as <code>defextractor</code> and <code>defhandler</code>, keyword lookup with <code>(:title h)</code>, threading macros, and\nClojure-style collection functions (<code>assoc</code>, <code>update-in</code>, <code>group-by</code> and others) that never modify their\narguments. Python is there for those who would rather not write Lisp; the collection functions are available in it\ntoo.</p>\n<p>Both languages can be mixed freely, even in one feed directory, because all files evaluate into one shared\nnamespace. Hy names are translated into Python names by the usual Hy rules, so a function defined in Hy as\n<code>parse-forum</code> is called from Python as <code>parse_forum</code>, and a Python function <code>clean_title</code> is <code>clean-title</code> in Hy.\nEvery Python library installed in the environment can be imported from either language.</p>\n<p>The user library (fetching, selecting, filtering, storage, responses) is available in every file without\nimports. The <strong>API</strong> tab lists it with signatures in both spellings. A few names that Hy mangling cannot produce\nhave Hy aliases: <code>filter-history!</code> is <code>filter_history_update</code> in Python, <code>store-object!</code> is <code>store_object</code>,\n<code>str-&gt;html</code> is <code>parse_html</code>.</p>\n<p>Some differences to keep in mind:</p>\n<ul>\n<li>In Python, the <code>as</code> and <code>async</code> options are passed as <code>as_</code> and <code>async_</code>: <code>fetch_url(url, as_=\"html\")</code>.\n  In Hy they are written <code>:as \"html\"</code>.</li>\n<li>Hy reads <code>:key value</code> in a call as a keyword argument, so option values are written as strings:\n  <code>(fetch-url url :as \"html\")</code>. For the same reason <code>(distinct-by \"link\" coll)</code> takes the key as a string.</li>\n<li><code>(:key m)</code> returns None for a missing key. A feed is a read-only mapping: <code>feed[\"source\"]</code>, <code>feed.source</code> and\n  <code>(:source feed)</code> are the same. Hy mangles dashes in keywords, so <code>(:image-type h)</code> reads the <code>\"image_type\"</code>\n  key; read a key that contains a dash with <code>(get h \"item-id\")</code>.</li>\n<li>Headlines are plain dicts with string keys, and <code>assoc</code> and the other collection functions take the keys as\n  strings: <code>(assoc h \"title\" \"x\")</code>. <code>(assoc h :title \"x\")</code> does not work, because <code>:title</code> in a call is a\n  keyword argument.</li>\n</ul>\n<h3 id=\"the-scratch-file\">The scratch file</h3>\n<p><code>scratch.hy</code> in the workspace root is a place to try code. It is never loaded with the workspace; <strong>Run</strong> (or\nCtrl S) evaluates it in a copy of the workspace namespace and shows what it prints, or the traceback of an\nerror, in the output pane. Use it to call a feed's\nfunctions by hand, fetch a page and try selectors on it, or change word filters.</p>\n<h3 id=\"logging\">Logging</h3>\n<p><code>log.write</code> writes a string, an exception (with its traceback) or any other value to the <strong>Log</strong> tab. A level\ncan be given as the first argument: <code>info</code> (the default), <code>warning</code> or <code>error</code>.</p>\n<pre><code class=\"language-python\">log.write(&quot;warning&quot;, f&quot;no items at {feed.source}&quot;)\n</code></pre>\n<h2 id=\"changing-headlines-with-code\">Changing headlines with code</h2>\n<p>There are three places where code can change what the selectors found, from the smallest to the largest.</p>\n<p>A headline is a dict with these fields:</p>\n<pre><code class=\"language-python\">{\n    &quot;title&quot;: &quot;Headline title&quot;,\n    &quot;link&quot;: &quot;Headline URL&quot;,\n    &quot;summary&quot;: &quot;Article summary (optional)&quot;,\n    &quot;content&quot;: &quot;Full article content (optional)&quot;,\n    &quot;author&quot;: &quot;Author name (optional)&quot;,\n    &quot;category&quot;: &quot;A category or a list of categories (optional)&quot;,\n    &quot;image&quot;: &quot;Image URL (optional)&quot;,\n    &quot;image_type&quot;: &quot;image/mime-type (optional)&quot;,\n    &quot;published&quot;: &quot;a datetime (optional)&quot;,\n    &quot;guid&quot;: &quot;a unique id (optional)&quot;,\n}\n</code></pre>\n<p>RSS, Atom and JSON Feed output ignore other fields; plain JSON output keeps all of them.</p>\n<h3 id=\"transform\">Transform</h3>\n<p>A function named in <code>transform</code> receives one headline and returns a changed copy, None to keep it as it is, or\nFalse to drop it:</p>\n<pre><code class=\"language-python\">def shout(headline):\n    return {**headline, &quot;title&quot;: headline[&quot;title&quot;].upper()}\n</code></pre>\n<pre><code class=\"language-hy\">(defn shout [headline]\n  (assoc headline &quot;title&quot; (.upper (:title headline))))\n</code></pre>\n<pre><code class=\"language-yaml\">transform: shout\n</code></pre>\n<h3 id=\"post-process\">Post-process</h3>\n<p>A function named in <code>post_process</code> (<code>post-process</code> is accepted too) receives the whole list of headlines after\n<code>transform</code> and before the filter steps, and returns a new list, or None to keep the list as it is:</p>\n<pre><code class=\"language-python\">def by_title(headlines):\n    return sorted(headlines, key=lambda h: h[&quot;title&quot;])\n</code></pre>\n<pre><code class=\"language-yaml\">post_process: by-title\n</code></pre>\n<p>The feed keeps the selectors, so when the source cannot be read it still gets the error headline that the\nbuilt-in extraction produces.</p>\n<h3 id=\"extractors\">Extractors</h3>\n<p>An extractor replaces the selectors altogether. The <code>extractor</code> field names an extractor function defined in code;\na feed directory with exactly one extractor uses it even without the field. An extractor receives the feed and\nreturns a list of headlines.</p>\n<p>This extractor sorts the headlines found by the feed selectors by title:</p>\n<pre><code class=\"language-python\">@extractor(&quot;my-first-extractor&quot;)\ndef my_first_extractor(feed):\n    headlines = parse_html_page(feed, feed.source)\n    return sorted(headlines or [], key=lambda h: h[&quot;title&quot;])\n</code></pre>\n<pre><code class=\"language-hy\">(defextractor my-first-extractor [feed]\n  (sorted (or (parse-html-page feed (:source feed)) [])\n          :key (fn [h] (:title h))))\n</code></pre>\n<h2 id=\"fetching-and-selecting-in-code\">Fetching and selecting in code</h2>\n<h3 id=\"fetching-web-resources\">Fetching web resources</h3>\n<p><code>fetch_url</code> (<code>fetch-url</code> in Hy) obtains the contents of a web resource. It does not raise on network or HTTP\nerrors; it returns None instead. <code>get_last_http_error</code> returns the status code of the last failed request,\n<code>get_last_http_response</code> the whole response, and <code>get_last_network_error</code> the network exception. Inside a\n<code>log_fetch_errors</code> block (the <code>log-fetch-errors</code> macro in Hy) every failed fetch is written to the log, which\nhelps when debugging.</p>\n<p>The <code>as</code> option converts the response:</p>\n<ul>\n<li><code>html</code>: a parsed HTML document for the selector functions</li>\n<li><code>xml</code>: a parsed XML document</li>\n<li><code>json</code>: parsed JSON</li>\n<li><code>string</code>: the response text</li>\n<li><code>bytes</code>: the response body</li>\n</ul>\n<p>Without it the raw response is returned. Other options include <code>method</code>, <code>headers</code>, <code>payload</code>, <code>cookies</code>,\n<code>proxy</code>, <code>retry</code>, <code>impersonate</code> and <code>timeout</code>, which is in milliseconds here (while <code>fetch.timeout</code> in\n<code>feed.yaml</code> is in seconds).</p>\n<h3 id=\"selecting-elements\">Selecting elements</h3>\n<p>Fetch a page with <code>as_=\"html\"</code> and take its parts with the selector functions, which accept the selectors\ndescribed in <a href=\"#selectors\">Selectors</a>:</p>\n<pre><code class=\"language-python\">q(node, &quot;div.post&quot;)              # all matches: elements, or strings for ::text and ::attr()\nq1(node, &quot;div.post h2::text&quot;)    # the first match, or None\ntext(node)                       # text content without tags\nattr(node, &quot;href&quot;)               # the value of an attribute\ninner_html(node)                 # the HTML inside the element\nouter_html(node)                 # the HTML of the element itself\nextract(node, base_url=url, title=&quot;h2::text&quot;, link=&quot;a&quot;)  # one headline, as the YAML selectors build it\napply_selectors(doc, feed)       # all headlines, with the selectors of the feed\n</code></pre>\n<p>In Hy, the <code>$</code> and <code>$1</code> macros do the same as <code>q</code> and <code>q1</code>, and check a literal selector when the file is loaded.\nThey also accept a selector written as a vector of keywords, where <code>:&gt;</code> is the child combinator:</p>\n<pre><code class=\"language-hy\">($ page &quot;div.post &gt; a&quot;)\n($1 page [:div.post :&gt; :a])\n(defselectors post-parts :item &quot;article&quot; :title &quot;h2::text&quot; :link &quot;h2 a&quot;)\n(post-parts page)                ; headlines\n</code></pre>\n<h3 id=\"proxies\">Proxies</h3>\n<p>Proxies are defined by name under <code>proxies</code> in <code>config.yml</code>, either as a URL or as a mapping:</p>\n<pre><code class=\"language-yaml\">proxies:\n  default: socks5://127.0.0.1:1080\n  work:\n    scheme: http          # http (the default), https, socks5, socks5h or socks4\n    host: proxy.example.com\n    port: 3128\n    user: me              # optional\n    password: secret      # optional\n</code></pre>\n<p>In the URL form, special characters in the user name and password must be percent-encoded. Changes take effect\nafter a restart.</p>\n<p>A fetch uses the proxy named by its <code>proxy</code> option, otherwise the one named by <code>fetch.proxy</code> of the current\nfeed. <code>proxy=False</code> forces a direct connection. A name that is not defined means a direct connection, without\nan error.</p>\n<p>The name <code>default</code> is not applied to feeds by itself; a feed must name it in <code>fetch.proxy</code>. Telegram calls use\nthe <code>fetch.proxy</code> of the calling feed too (or their own <code>proxy</code> argument); when the feed names none, they go\nthrough the proxy named <code>default</code> only if <code>telegram.default-proxy</code> is true. The <code>/forward</code> links made by\n<code>forward_url(url, referer, proxy=\"name\")</code> fetch through the named proxy. WebSub callbacks never use a proxy.</p>\n<h2 id=\"browsers\">Browsers</h2>\n<p>Pages that need JavaScript can be opened in a real browser, either with <code>fetch.backend: browser</code> in the feed or\nfrom code:</p>\n<pre><code class=\"language-python\">with browser() as b:\n    page = b.open(feed.source, wait_for=&quot;article&quot;, scroll=3)\n    headlines = page.apply_selectors(feed)\n</code></pre>\n<pre><code class=\"language-hy\">(with-browser [b]\n  (-&gt; (.open b (:source feed) :wait-for &quot;article&quot;)\n      (.apply-selectors feed)))\n</code></pre>\n<p>A page can also be driven: <code>goto</code>, <code>click</code>, <code>fill</code>, <code>press</code>, <code>wait_for</code>, <code>wait</code>, <code>scroll</code>, <code>evaluate</code> (with\n<code>load_js</code> for scripts kept in files), <code>screenshot</code>, <code>html</code>, <code>text</code> and <code>url</code>. The Browser section of the API tab\ndescribes every method of the browser and the page.</p>\n<p>Browsers run in the worker; code in the web process (the console) reaches them over the local RPC. Each\n<code>with browser()</code> block starts a browser and closes it at the end.</p>\n<p>After a page is opened, later <code>fetch_url</code> calls to the same host reuse the browser's cookies and user agent\n(kept in memory by the process until it restarts), so a browser can pass a challenge and plain fetches can do\nthe rest.</p>\n<p>The browser does not use the proxies defined in <code>config.yml</code>: <code>fetch.proxy</code> has no effect on\n<code>fetch.backend: browser</code>.</p>\n<h3 id=\"profiles\">Profiles</h3>\n<p>A profile is a named, persistent browser data directory, <code>data/browser/&lt;profile&gt;/</code>, which keeps cookies, local\nstorage and logins between runs. Profiles need no definition: a new name creates its directory on first use.\nChoose one with <code>browser(profile=\"shop\")</code> or <code>(with-browser [b :profile \"shop\"] ...)</code>; the default is\n<code>default</code>, and <code>fetch.backend: browser</code> always uses <code>default</code>. One profile can be open in one browser at a\ntime, so jobs on the same profile wait for each other even when the pool has room.</p>\n<p>To log in to a site once, open the profile headful (<code>browser-headless: false</code>), log in by hand, and later runs\nreuse the session. <code>chrome-profile.sh [profile] [url]</code> opens Chrome with a pool profile for the patchright and\nplaywright engines, and <code>firefox-profile.sh [profile] [url]</code> opens Camoufox for the camoufox engine. Close the\nwindow before the worker uses the profile.</p>\n<p>Profiles are per engine: cookies and sign-ins saved by Chrome do not carry over to camoufox. Use a new profile\nname (or clear the folder) when switching engines, and sign in again.</p>\n<h3 id=\"security-checks\">Security checks</h3>\n<p>Sites behind a security check (DDoS-Guard, a bot check of their own) show the content only after the check passes\nand reloads the page, which can take ten seconds or more. Wait for the content rather than for a fixed time:\n<code>page.wait_for(selector, timeout, required=False)</code> keeps waiting through the reload and returns False on a timeout\ninstead of raising, so the code can reload once or give up. The clearance cookies stay in the profile, so usually\nonly the first page of a run waits.</p>\n<h3 id=\"cloudflare-challenges\">Cloudflare challenges</h3>\n<p><code>(solve-captcha url :profile \"default\")</code> opens a page in a pool browser and passes a Cloudflare challenge on it\n(the \"Just a moment...\" page or a Turnstile checkbox); in an open browser, <code>(.solve-captcha page)</code> does the same\nfor that page. Both return <code>True</code> when the page is through.</p>\n<p>Turnstile ignores clicks the browser driver makes, so the real pointer is moved and clicked with pyautogui: three\nmoves to random points at least 15% of the screen away from its edges, then a click on the checkbox, and a second\ntry when the challenge stays. The checkbox is found in the page, not at fixed screen coordinates: its place comes\nfrom the widget's box, and page coordinates are mapped to the screen by moving the pointer over the page and\nreading where the page saw it. <code>captcha-position</code> is the fallback when no widget is found. One solve runs at a\ntime, since there is one pointer.</p>\n<p>This needs pyautogui and a headful browser on a display the worker can reach, with the window not covered by\nothers:</p>\n<pre><code>python3 install.py --with-captcha\n</code></pre>\n<p>On Linux, when the worker runs as another user than the desktop session, allow it on the desktop display with\n<code>xhost +</code> (or <code>xhost +SI:localuser:&lt;user&gt;</code>) and set <code>browser-display: \":0\"</code>. Under Xvfb the clicks work too,\nbut nobody can watch them. Set <code>captcha-flash: true</code> to see where the pointer acts while checking a setup.</p>\n<h3 id=\"browser-settings\">Browser settings</h3>\n<p>The browser is set up in <code>config.yml</code>:</p>\n<table>\n<thead>\n<tr>\n<th>Key</th>\n<th>Default</th>\n<th>Meaning</th>\n</tr>\n</thead>\n<tbody>\n<tr>\n<td><code>browser-engine</code></td>\n<td><code>camoufox</code></td>\n<td><code>camoufox</code> (Firefox based), <code>patchright</code> or <code>playwright</code></td>\n</tr>\n<tr>\n<td><code>browser-channel</code></td>\n<td><code>chrome</code></td>\n<td>the installed browser patchright or playwright drives; the bundled Chromium when it is missing</td>\n</tr>\n<tr>\n<td><code>browser-pool-size</code></td>\n<td><code>1</code></td>\n<td>how many browsers may run at once; further jobs wait</td>\n</tr>\n<tr>\n<td><code>browser-headless</code></td>\n<td>see below</td>\n<td><code>true</code> or <code>false</code>; by default headful on Linux when a display or Xvfb is available, otherwise headless</td>\n</tr>\n<tr>\n<td><code>browser-display</code></td>\n<td>none</td>\n<td>Linux: the X display the worker uses when <code>DISPLAY</code> is not set, such as <code>\":0\"</code></td>\n</tr>\n<tr>\n<td><code>captcha-position</code></td>\n<td>none</td>\n<td><code>[x, y]</code>: the screen point <code>solve-captcha</code> clicks when it cannot find the Turnstile widget</td>\n</tr>\n<tr>\n<td><code>captcha-flash</code></td>\n<td><code>false</code></td>\n<td><code>solve-captcha</code> shows a marker at each point the pointer moves to</td>\n</tr>\n</tbody>\n</table>\n<p>Engine and channel are global; profiles cannot set their own. Changes take effect after a restart, because the\nbrowser pool lives in the worker process.</p>\n<p>On Linux without a display the worker starts Xvfb, when it is installed, so the browser runs headful, which is\nless detectable than headless. Install it with the distribution's package (<code>xorg-x11-server-Xvfb</code> on\nFedora/RHEL, <code>xvfb</code> on Debian/Ubuntu). <code>browser-headless: true</code> forces headless mode.</p>\n<h3 id=\"browser-engines\">Browser engines</h3>\n<table>\n<thead>\n<tr>\n<th>Engine</th>\n<th>Browser</th>\n<th>Setup</th>\n</tr>\n</thead>\n<tbody>\n<tr>\n<td><code>camoufox</code> (default)</td>\n<td>a Firefox build with fingerprint spoofing</td>\n<td><code>install.py --with-browser</code></td>\n</tr>\n<tr>\n<td><code>patchright</code></td>\n<td>the installed Chrome (<code>browser-channel</code>), patched against automation detection</td>\n<td><code>install.py --with-browser=patchright</code></td>\n</tr>\n<tr>\n<td><code>playwright</code></td>\n<td>stock Playwright Chromium, no stealth</td>\n<td><code>install.py --with-browser=playwright</code></td>\n</tr>\n</tbody>\n</table>\n<p>No engine is installed with the core package. <code>install.py</code> installs the chosen ones into the virtual environment\nand downloads their browsers: the Camoufox build (kept in the user's cache folder, outside the venv), or for\npatchright and playwright their Chromium when no Chrome is installed. It then test-launches Camoufox; on Linux a\nfailure there usually means missing system libraries (GTK 3, libX11-xcb, ALSA), which the distribution's firefox\npackage brings in. Several engines can be installed at once (<code>--with-browser=camoufox,patchright</code>); the one in\nuse is <code>browser-engine</code>, and switching it needs a restart. If the engine set there is not installed, a browser\nfeed fails with \"browser-engine is patchright, but it is not installed\".</p>\n<p>With camoufox, each profile keeps one fingerprint for the host's OS in\n<code>data/browser/&lt;profile&gt;/feedxcavator-fingerprint.json</code>, created on the first launch, so the sign-in script and the\nworker present the same browser. The file also keeps the host GPU that Camoufox reads by starting a bare browser\nfor a moment (a short extra window), so this happens once per profile, normally in <code>firefox-profile.sh</code>. Delete\nthe file to get a new identity, or after changing the machine's graphics.</p>\n<h2 id=\"telegram\">Telegram</h2>\n<p><code>telegram.get_channel_messages(channel)</code> returns headlines for the latest messages of a public Telegram channel,\nand <code>telegram.notify(message, chat_id)</code> sends a text message. Both need <code>api-id</code> and <code>api-hash</code> under the\n<code>telegram</code> key of <code>config.yml</code> and a one-time login with <code>python -m feedxcavator telegram-login</code>.</p>\n<h2 id=\"handlers\">Handlers</h2>\n<p>Handlers define a custom web API for your feeds. A handler registered with the name <code>my-first-handler</code> is called\nwhen <code>http://&lt;host&gt;:10000/handler/my-first-handler</code> is visited. Its arguments receive the query or form parameters\nof the same names. A handler whose only argument is called <code>request</code> receives the whole request instead\n(<code>method</code>, <code>path</code>, <code>headers</code>, <code>body</code>, <code>params</code>, <code>json</code>).</p>\n<p>A handler returns one of the response functions (<code>text_page</code>, <code>json_page</code>, <code>web_page</code>, <code>redirect_to</code> and others),\na dict or list that is sent as JSON, or None for an empty response.</p>\n<pre><code class=\"language-python\">@handler(&quot;my-first-handler&quot;)\ndef my_first_handler(param):\n    log.write(param)\n    return text_page(&quot;OK&quot;)\n</code></pre>\n<h3 id=\"the-api-token\">The API token</h3>\n<p>With <code>auth=True</code> (<code>^:auth</code> in Hy) the request must carry the API token in the <code>x-feedxcavator-auth</code> header. The\ntoken is generated on the Settings tab. It is stored hashed and shown only once, so copy it when it appears.</p>\n<p>This handler gives the stored output of a background feed to an external program and takes the processed output\nback:</p>\n<pre><code class=\"language-hy\">(defhandler ^:auth my-secure-handler request\n  (setv feed (find-feed &quot;kitty-site&quot;))\n  (if (= (:method request) &quot;GET&quot;)\n      ;; return the stored kitty feed for external processing\n      (do (setv output (fetch-feed-output feed))\n          (web-page (:content-type output) (:output output)))\n      ;; store the externally processed output\n      (do (store-feed-output! feed {&quot;content_type&quot; &quot;application/json&quot;\n                                    &quot;output&quot; (.decode (:body request) &quot;utf-8&quot;)})\n          (text-page &quot;OK&quot;))))\n</code></pre>\n<h3 id=\"word-filters-over-http\">Word filters over HTTP</h3>\n<p>The REST API at <code>/api/wordfilter/&lt;action&gt;</code> changes word filters from outside the server. The actions are <code>list</code>,\n<code>list-words</code>, <code>add-word</code>, <code>remove-word</code>, <code>add-regex</code> and <code>remove-regex</code>; each takes a JSON body and the API token.\nThe author uses <a href=\"https://gist.github.com/GChristensen/c4be3bb8508ad13d982c2f57ac302eb8\">these</a> commands for the\n<a href=\"https://gchristensen.github.io/ishell\">iShell browser extension</a>.</p>\n<h2 id=\"examples\">Examples</h2>\n<p>Fetch new threads from a set of bulletin board forums. The <code>params</code> field of the feed holds the numeric ids of the\nforums, and the feed selectors describe the thread list of a forum page.</p>\n<pre><code class=\"language-hy\">(defextractor bb-extractor [feed]\n  (lfor forum (:params feed)\n        :setv forum-url (+ (:source feed) (str forum))\n        ;; stage 1: thread links from the forum page, without the ones seen before\n        thread (filter-history! forum-url (or (parse-html-page feed forum-url) []))\n        ;; stage 2: the first post of every thread\n        :setv page (fetch-url (:link thread) :as &quot;html&quot;)\n        (do (log.write (+ &quot;visited: &quot; (:link thread)))\n            (assoc thread\n                   &quot;title&quot; (html-unescape (:title thread))\n                   &quot;image&quot; (q1 page &quot;.post_text img::attr(src)&quot;)\n                   &quot;summary&quot; (outer-html ($1 page &quot;.post_text&quot;))))))\n</code></pre>\n<p>Extract data from a JSON API. The <code>params</code> field holds the user id.</p>\n<pre><code class=\"language-python\">API_TOKEN = &quot;...&quot;\n\n@extractor(&quot;json-api-extractor&quot;)\ndef json_api_extractor(feed):\n    url = f&quot;https://json.api/method/data.get?user_id={feed.params}&amp;access_token={API_TOKEN}&amp;v=1&quot;\n    posts = get_in(fetch_url(url, as_=&quot;json&quot;), [&quot;response&quot;, &quot;items&quot;], [])\n    headlines = [{&quot;title&quot;: p.get(&quot;title&quot;),\n                  &quot;link&quot;: p.get(&quot;url&quot;),\n                  &quot;summary&quot;: p.get(&quot;text&quot;),\n                  &quot;image&quot;: get_in(p, [&quot;attachments&quot;, &quot;photo_640&quot;]) or get_in(p, [&quot;attachments&quot;, &quot;photo_320&quot;])}\n                 for p in posts]\n    return sorted(headlines, key=lambda h: h[&quot;link&quot;] or &quot;&quot;, reverse=True)\n</code></pre>\n<p>Transform another RSS feed and turn its titles upper case. The selectors read the XML, and a transform function\nchanges the titles, so no extractor is needed:</p>\n<pre><code class=\"language-yaml\">title: Loud feed\nsource: https://example.com/rss.xml\nselectors:\n  item: item\n  title: title::text\n  link: link::text\n  summary: description::text\ntransform: shout\n</code></pre>\n<pre><code class=\"language-hy\">(defn shout [headline]\n  (assoc headline &quot;title&quot; (.upper (:title headline))))\n</code></pre>\n<p>A task function that runs after the morning feeds:</p>\n<pre><code class=\"language-python\">@task_function(&quot;aggregate&quot;)\ndef aggregate(ctx):\n    log.write(f&quot;aggregating after {ctx['trigger']}&quot;)\n</code></pre>\n<h2 id=\"hostnames-a-reader-on-the-same-machine\">Hostnames: a reader on the same machine</h2>\n<p>The server is reached from two directions: browsers follow the links written into feed items, and a WebSub\nsubscriber talks to the hub and is pushed updates. When the reader runs on the same machine and the machine's LAN\nname resolves to itself there, one address serves both.</p>\n<p>Example: Feedxcavator and NewsSharp, a web feed reader, run on a machine called <code>lab</code>. People read news in a\nbrowser on other computers of the LAN. NewsSharp subscribes to Feedxcavator over WebSub.</p>\n<pre><code class=\"language-yaml\">port: 21000\nhost: 0.0.0.0                     # listen on the LAN too, not only on 127.0.0.1\nhostname: 'http://lab:21000'      # websub-hostname and secure-hostname default to it\n#secure-hostname: 'https://lab:22000'   # only with an HTTPS reverse proxy, see HTTPS in the README\n</code></pre>\n<ul>\n<li><code>hostname</code> is the base of image, redirect and forward links in feed items, of each feed's <code>self</code> link and of its\n  <code>hub</code> link (<code>http://lab:21000/websub</code>). Browsers on the LAN and NewsSharp on <code>lab</code> can all open it.</li>\n<li>In NewsSharp, add feeds by the same address, for example <code>http://lab:21000/feed/city-paper</code>, so the\n  subscription URL equals the feed's <code>self</code> link. Feeds without <code>tasks</code>, which are extracted when NewsSharp polls\n  them, then also get <code>lab</code> links: during a request the server writes links with the address the request came to.</li>\n<li>NewsSharp chooses the callback URL and sends it with the subscription. Feedxcavator opens it from <code>lab</code> to verify\n  the subscription and to push updates, so it may use <code>localhost</code> or <code>lab</code>. If the callback cannot be opened, the\n  subscription is not verified and the log shows \"WebSub verification failed\".</li>\n</ul>\n<p>Check that the name resolves on the server itself (<code>ping lab</code> there). If it does not, add <code>127.0.0.1 lab</code> to the\nhosts file, or keep <code>hostname</code> at <code>lab</code> and set <code>websub-hostname: 'http://localhost:21000'</code>. With the second\noption, subscribe at the <code>localhost</code> URL. A feed without tasks that NewsSharp polls at <code>localhost</code> then gets\n<code>localhost</code> image links, which do not open on other computers.</p>\n<h2 id=\"maintenance\">Maintenance</h2>\n<p>The daily service task (<code>service-task</code> in <code>config.yml</code>) deletes stored images and log entries older than\n<code>max-age-days</code>, and prunes old history and run records. Run records are kept for <code>run-history-days</code> days.</p>\n<p>The Settings tab downloads a backup of the database, optionally with the workspace, and restores one; the\nworkspace of a backup is unpacked only into an empty workspace directory. The tab can also\npurge stored images and restart the server when it runs under the supervisor or the systemd unit. Child processes\n(browsers) are stopped on shutdown; when the server is killed forcibly, the children it left behind are stopped on\nthe next start.</p>\n<p>When <code>repl-port</code> is set (or <code>FEEDXCAVATOR_REPL_PORT</code>), the worker opens a Python/Hy REPL bound to 127.0.0.1 that\nshares the namespace of the workspace code.</p>",
+  "toc": [
+   {
+    "level": 1,
+    "id": "feedxcavator-manual",
+    "name": "Feedxcavator manual",
+    "html": "Feedxcavator manual",
+    "data-toc-label": "",
+    "children": [
+     {
+      "level": 2,
+      "id": "how-feedxcavator-works",
+      "name": "How Feedxcavator works",
+      "html": "How Feedxcavator works",
+      "data-toc-label": "",
+      "children": []
+     },
+     {
+      "level": 2,
+      "id": "the-console",
+      "name": "The console",
+      "html": "The console",
+      "data-toc-label": "",
+      "children": [
+       {
+        "level": 3,
+        "id": "the-workspace-tab",
+        "name": "The Workspace tab",
+        "html": "The Workspace tab",
+        "data-toc-label": "",
+        "children": []
+       }
+      ]
+     },
+     {
+      "level": 2,
+      "id": "your-first-feed",
+      "name": "Your first feed",
+      "html": "Your first feed",
+      "data-toc-label": "",
+      "children": []
+     },
+     {
+      "level": 2,
+      "id": "selectors",
+      "name": "Selectors",
+      "html": "Selectors",
+      "data-toc-label": "",
+      "children": []
+     },
+     {
+      "level": 2,
+      "id": "reading-several-pages",
+      "name": "Reading several pages",
+      "html": "Reading several pages",
+      "data-toc-label": "",
+      "children": []
+     },
+     {
+      "level": 2,
+      "id": "automatic-extraction",
+      "name": "Automatic extraction",
+      "html": "Automatic extraction",
+      "data-toc-label": "",
+      "children": []
+     },
+     {
+      "level": 2,
+      "id": "filtering-headlines",
+      "name": "Filtering headlines",
+      "html": "Filtering headlines",
+      "data-toc-label": "",
+      "children": [
+       {
+        "level": 3,
+        "id": "word-filters",
+        "name": "Word filters",
+        "html": "Word filters",
+        "data-toc-label": "",
+        "children": []
+       }
+      ]
+     },
+     {
+      "level": 2,
+      "id": "fetch-options-and-output-formats",
+      "name": "Fetch options and output formats",
+      "html": "Fetch options and output formats",
+      "data-toc-label": "",
+      "children": []
+     },
+     {
+      "level": 2,
+      "id": "feed-definition-reference",
+      "name": "Feed definition reference",
+      "html": "Feed definition reference",
+      "data-toc-label": "",
+      "children": []
+     },
+     {
+      "level": 2,
+      "id": "organizing-the-workspace",
+      "name": "Organizing the workspace",
+      "html": "Organizing the workspace",
+      "data-toc-label": "",
+      "children": [
+       {
+        "level": 3,
+        "id": "templates",
+        "name": "Templates",
+        "html": "Templates",
+        "data-toc-label": "",
+        "children": []
+       },
+       {
+        "level": 3,
+        "id": "group-libraries",
+        "name": "Group libraries",
+        "html": "Group libraries",
+        "data-toc-label": "",
+        "children": []
+       },
+       {
+        "level": 3,
+        "id": "errors-while-loading",
+        "name": "Errors while loading",
+        "html": "Errors while loading",
+        "data-toc-label": "",
+        "children": []
+       },
+       {
+        "level": 3,
+        "id": "feed-identity",
+        "name": "Feed identity",
+        "html": "Feed identity",
+        "data-toc-label": "",
+        "children": []
+       }
+      ]
+     },
+     {
+      "level": 2,
+      "id": "background-extraction",
+      "name": "Background extraction",
+      "html": "Background extraction",
+      "data-toc-label": "",
+      "children": [
+       {
+        "level": 3,
+        "id": "tasks",
+        "name": "Tasks",
+        "html": "Tasks",
+        "data-toc-label": "",
+        "children": []
+       },
+       {
+        "level": 3,
+        "id": "schedules",
+        "name": "Schedules",
+        "html": "Schedules",
+        "data-toc-label": "",
+        "children": []
+       },
+       {
+        "level": 3,
+        "id": "websub",
+        "name": "WebSub",
+        "html": "WebSub",
+        "data-toc-label": "",
+        "children": []
+       }
+      ]
+     },
+     {
+      "level": 2,
+      "id": "writing-code-python-and-hy",
+      "name": "Writing code: Python and Hy",
+      "html": "Writing code: Python and Hy",
+      "data-toc-label": "",
+      "children": [
+       {
+        "level": 3,
+        "id": "the-scratch-file",
+        "name": "The scratch file",
+        "html": "The scratch file",
+        "data-toc-label": "",
+        "children": []
+       },
+       {
+        "level": 3,
+        "id": "logging",
+        "name": "Logging",
+        "html": "Logging",
+        "data-toc-label": "",
+        "children": []
+       }
+      ]
+     },
+     {
+      "level": 2,
+      "id": "changing-headlines-with-code",
+      "name": "Changing headlines with code",
+      "html": "Changing headlines with code",
+      "data-toc-label": "",
+      "children": [
+       {
+        "level": 3,
+        "id": "transform",
+        "name": "Transform",
+        "html": "Transform",
+        "data-toc-label": "",
+        "children": []
+       },
+       {
+        "level": 3,
+        "id": "post-process",
+        "name": "Post-process",
+        "html": "Post-process",
+        "data-toc-label": "",
+        "children": []
+       },
+       {
+        "level": 3,
+        "id": "extractors",
+        "name": "Extractors",
+        "html": "Extractors",
+        "data-toc-label": "",
+        "children": []
+       }
+      ]
+     },
+     {
+      "level": 2,
+      "id": "fetching-and-selecting-in-code",
+      "name": "Fetching and selecting in code",
+      "html": "Fetching and selecting in code",
+      "data-toc-label": "",
+      "children": [
+       {
+        "level": 3,
+        "id": "fetching-web-resources",
+        "name": "Fetching web resources",
+        "html": "Fetching web resources",
+        "data-toc-label": "",
+        "children": []
+       },
+       {
+        "level": 3,
+        "id": "selecting-elements",
+        "name": "Selecting elements",
+        "html": "Selecting elements",
+        "data-toc-label": "",
+        "children": []
+       },
+       {
+        "level": 3,
+        "id": "proxies",
+        "name": "Proxies",
+        "html": "Proxies",
+        "data-toc-label": "",
+        "children": []
+       }
+      ]
+     },
+     {
+      "level": 2,
+      "id": "browsers",
+      "name": "Browsers",
+      "html": "Browsers",
+      "data-toc-label": "",
+      "children": [
+       {
+        "level": 3,
+        "id": "profiles",
+        "name": "Profiles",
+        "html": "Profiles",
+        "data-toc-label": "",
+        "children": []
+       },
+       {
+        "level": 3,
+        "id": "security-checks",
+        "name": "Security checks",
+        "html": "Security checks",
+        "data-toc-label": "",
+        "children": []
+       },
+       {
+        "level": 3,
+        "id": "cloudflare-challenges",
+        "name": "Cloudflare challenges",
+        "html": "Cloudflare challenges",
+        "data-toc-label": "",
+        "children": []
+       },
+       {
+        "level": 3,
+        "id": "browser-settings",
+        "name": "Browser settings",
+        "html": "Browser settings",
+        "data-toc-label": "",
+        "children": []
+       },
+       {
+        "level": 3,
+        "id": "browser-engines",
+        "name": "Browser engines",
+        "html": "Browser engines",
+        "data-toc-label": "",
+        "children": []
+       }
+      ]
+     },
+     {
+      "level": 2,
+      "id": "telegram",
+      "name": "Telegram",
+      "html": "Telegram",
+      "data-toc-label": "",
+      "children": []
+     },
+     {
+      "level": 2,
+      "id": "handlers",
+      "name": "Handlers",
+      "html": "Handlers",
+      "data-toc-label": "",
+      "children": [
+       {
+        "level": 3,
+        "id": "the-api-token",
+        "name": "The API token",
+        "html": "The API token",
+        "data-toc-label": "",
+        "children": []
+       },
+       {
+        "level": 3,
+        "id": "word-filters-over-http",
+        "name": "Word filters over HTTP",
+        "html": "Word filters over HTTP",
+        "data-toc-label": "",
+        "children": []
+       }
+      ]
+     },
+     {
+      "level": 2,
+      "id": "examples",
+      "name": "Examples",
+      "html": "Examples",
+      "data-toc-label": "",
+      "children": []
+     },
+     {
+      "level": 2,
+      "id": "hostnames-a-reader-on-the-same-machine",
+      "name": "Hostnames: a reader on the same machine",
+      "html": "Hostnames: a reader on the same machine",
+      "data-toc-label": "",
+      "children": []
+     },
+     {
+      "level": 2,
+      "id": "maintenance",
+      "name": "Maintenance",
+      "html": "Maintenance",
+      "data-toc-label": "",
+      "children": []
+     }
+    ]
+   }
+  ]
+ }
+}

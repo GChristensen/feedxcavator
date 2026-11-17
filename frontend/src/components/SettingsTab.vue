@@ -5,6 +5,7 @@ import { api, describeError } from '../api'
 import { formatTime } from '../time'
 
 const store = inject('store')
+const DEMO = !!import.meta.env.VITE_DEMO
 
 const form = reactive({ subscription_url: '' })
 const token = ref('')
@@ -110,7 +111,7 @@ onMounted(load)
       <legend>Customization</legend>
       <div class="row">
         <label for="subscription-url">Subscription URL</label>
-        <input id="subscription-url" v-model="form.subscription_url" type="text" placeholder="https://newsblur/?url="
+        <input id="subscription-url" v-model="form.subscription_url" type="text" placeholder="http://newssharp/?url="
                @blur="save({ subscription_url: form.subscription_url }, 'custom')" />
         <span class="note">{{ notes.custom }}</span>
       </div>
@@ -135,7 +136,8 @@ onMounted(load)
       <legend>Database</legend>
       <div class="row">
         <label>Backup</label>
-        <a class="button" :href="'/front/api/backup?workspace=' + withWorkspace">Download backup</a>
+        <a class="button" :href="DEMO ? null : '/front/api/backup?workspace=' + withWorkspace"
+           :title="DEMO ? 'Not available in the demo' : null">Download backup</a>
         <label style="min-width: 0"><input v-model="withWorkspace" type="checkbox" /> include the workspace</label>
       </div>
       <div class="row">

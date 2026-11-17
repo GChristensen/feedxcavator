@@ -33,6 +33,7 @@ function tabFromHash() {
   return TABS.some((t) => t.id === id) ? id : 'workspace' // UI-2
 }
 
+const DEMO = !!import.meta.env.VITE_DEMO
 const current = ref(tabFromHash())
 const visited = reactive(new Set([current.value])) // UI-1: a tab is built when first shown
 const workspace = ref(null)
@@ -155,6 +156,10 @@ onUnmounted(() => {
         </svg>
       </a>
     </header>
+    <div v-if="DEMO" class="demo-banner">
+      Demo: there is no server behind this page. Test shows output recorded from a real run, and changes stay in
+      this tab until it is reloaded.
+    </div>
     <div class="tab-content">
       <WorkspaceTab v-if="visited.has('workspace')" v-show="current === 'workspace'" ref="workspace" />
       <TasksTab v-if="visited.has('tasks')" v-show="current === 'tasks'" :active="current === 'tasks'" />

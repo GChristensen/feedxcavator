@@ -28,6 +28,9 @@ a { color: var(--accent); }
 
 .app { display: flex; flex-direction: column; height: 100%; }
 
+/* the static demo build (npm run build:demo) */
+.demo-banner { flex: none; padding: 5px 12px; font-size: 12px; color: #1c1c1f; background: var(--warning); }
+
 /* app bar: brand, section tabs and status on one 40 px row */
 .appbar { height: 40px; flex: none; display: flex; align-items: stretch; gap: 6px; padding: 0 8px 0 12px;
   border-bottom: 1px solid var(--border); background: var(--bg); }

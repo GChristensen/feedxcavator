@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Orbital Lab (@orbitallab): a fictional profile page for the Feedxcavator demo</title>
+<style>
+  body { margin: 0; font: 15px/1.4 system-ui, sans-serif; background: #f5f6f8; color: #14171a; }
+  main { max-width: 600px; margin: 0 auto; background: #fff; min-height: 100vh; border-inline: 1px solid #e3e6ea; }
+  header { padding: 16px; border-bottom: 1px solid #e3e6ea; }
+  header h1 { margin: 0; font-size: 20px; }
+  header p { margin: 4px 0 0; color: #5b6670; }
+  .note { padding: 8px 16px; font-size: 13px; background: #fff7d6; }
+  article { display: grid; grid-template-columns: 44px 1fr; gap: 10px; padding: 12px 16px; border-bottom: 1px solid #e3e6ea; }
+  .avatar { width: 44px; height: 44px; border-radius: 50%; background: linear-gradient(135deg, #3b6fd8, #7a3bd8); }
+  .head { color: #5b6670; }
+  .head a { color: inherit; text-decoration: none; }
+  .head .name { color: #14171a; font-weight: 700; }
+  [data-testid=tweetText] { margin: 2px 0 8px; white-space: pre-line; }
+  [data-testid=tweetPhoto] img { width: 100%; border-radius: 12px; display: block; }
+  #loading { padding: 16px; text-align: center; color: #5b6670; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Orbital Lab</h1>
+    <p>@orbitallab · An invented space research lab. Nothing on this page is real.</p>
+  </header>
+  <div class="note">A test page for the Feedxcavator demo: the posts are drawn by a script and more load as you
+    scroll, so only a browser sees them.</div>
+  <section id="timeline"></section>
+  <div id="loading">Loading…</div>
+</main>
+<script>
+const POSTS = [
+  ['The Kestrel-2 cubesat sent its first full image set overnight. The coastline shots are sharper than we hoped.', 'thumb-1.svg'],
+  ['Reminder: the open lab day is this Saturday. Bring questions, we bring the thermal vacuum chamber.', null],
+  ['Our student team finished the parachute drop tests: 14 out of 15 clean deployments. The 15th is now a lesson.', 'thumb-2.svg'],
+  ['New paper: measuring micrometeoroid wear on solar panel coatings after 400 days in low orbit.', null],
+  ['The ground station antenna is back online after the storm. Thanks to everyone who stayed late.', 'thumb-3.svg'],
+  ['Kestrel-2 passes over the lab at 21:40 tonight. It is too small to see, but we will wave anyway.', null],
+  ['Battery health after 1,000 charge cycles: 93%. Engineering is quietly very pleased.', null],
+  ['We are hiring two firmware engineers who enjoy radiation-tolerant code and bad puns.', null],
+  ['Clean room tour, part 3: why everything here is wrapped in foil (it is not for the snacks).', 'thumb-1.svg'],
+  ['Kestrel-3 has a name, a frame and a very long checklist. Integration starts next month.', 'thumb-2.svg'],
+  ['Throwback to the first prototype, held together with zip ties and optimism.', null],
+  ['Our orbit simulator is now open source. Pull requests welcome, orbital decay not included.', null],
+  ['Telemetry dashboard update: you can now see the cubesat temperature in Kelvin, Celsius or "warm-ish".', null],
+  ['The deployment springs passed the cold soak at -40 °C. Next up: the shaker table.', 'thumb-3.svg'],
+  ['Thank you for 10,000 followers. Every one of you is now an honorary member of mission control.', null],
+]
+const timeline = document.getElementById('timeline')
+let shown = 0
+
+function render(count) {
+  const now = Date.now()
+  for (const [i, [text, photo]] of POSTS.slice(shown, shown + count).entries()) {
+    const n = shown + i
+    const when = new Date(now - (n * 5 + 2) * 3600 * 1000)
+    const article = document.createElement('article')
+    article.dataset.testid = 'tweet'
+    article.innerHTML = `
+      <div class="avatar"></div>
+      <div>
+        <div class="head"><a class="name" href="/orbitallab">Orbital Lab</a> <a href="/orbitallab">@orbitallab</a> ·
+          <a href="/orbitallab/status/${1900000 + n}"><time datetime="${when.toISOString()}">${n * 5 + 2}h</time></a></div>
+        <div data-testid="tweetText"></div>
+        ${photo ? `<div data-testid="tweetPhoto"><img alt="" src="img/${photo}"></div>` : ''}
+      </div>`
+    article.querySelector('[data-testid=tweetText]').textContent = text
+    timeline.append(article)
+  }
+  shown = Math.min(POSTS.length, shown + count)
+  document.getElementById('loading').textContent = shown < POSTS.length ? 'Loading…' : 'No more posts.'
+}
+
+// like the real thing: nothing in the HTML, a first batch after a moment, more on scrolling
+setTimeout(() => render(5), 600)
+window.addEventListener('scroll', () => {
+  if (shown && shown < POSTS.length && innerHeight + scrollY > document.body.offsetHeight - 200) {
+    setTimeout(() => render(5), 300)
+  }
+})
+</script>
+</body>
+</html>

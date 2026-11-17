@@ -343,7 +343,7 @@ async function openFeedUrl(feed) {
 async function subscribe(feed) {
   const url = await feedUrl(feed)
   if (!url) return
-  const base = store.settings.subscription_url || 'https://newsblur/?url=' // UI-8
+  const base = store.settings.subscription_url || 'http://newssharp/?url=' // UI-8
   window.open(base + encodeURIComponent(url), '_blank', 'noopener')
 }
 

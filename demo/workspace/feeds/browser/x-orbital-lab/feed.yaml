@@ -1,0 +1,16 @@
+title: 'X: Orbital Lab'
+suffix: x-orbital-lab
+# A fictional profile page (demo/sites/x.html, served by tools/record_demo.py). Its posts are drawn by a script
+# and more load on scrolling, as on x.com, so x.py reads it in Camoufox. For a real profile, use its address and
+# a browser profile signed in to X: params: {profile: x}, then ./firefox-profile.sh x https://x.com
+source: http://127.0.0.1:21901/x.html
+tags: [browser]
+extractor: x-profile
+selectors:
+  item: 'article[data-testid=tweet]'
+  title: '[data-testid=tweetText]'
+  summary: '[data-testid=tweetText]'
+  link: 'a[href*="/status/"]'
+  image: '[data-testid=tweetPhoto] img'
+  published: {css: 'time::attr(datetime)', parse: date}
+tasks: [browser]

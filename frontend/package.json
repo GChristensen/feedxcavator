@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build"
+    "build": "vite build",
+    "dev:demo": "vite --mode demo",
+    "build:demo": "node demo-post.mjs clean && vite build --mode demo && node demo-post.mjs"
   },
   "dependencies": {
     "ace-builds": "^1.36.0",

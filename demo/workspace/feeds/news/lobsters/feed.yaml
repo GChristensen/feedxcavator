@@ -1,0 +1,13 @@
+title: 'Lobsters'
+suffix: lobsters
+source: https://lobste.rs/
+tags: [news]
+selectors:
+  item: .story
+  title: a.u-url
+  link: a.u-url
+  author: a.u-author
+  category: {css: 'a.tag::text', many: true}
+filter:
+  - wordfilter: {name: noise, fields: [title]}
+tasks: [news]

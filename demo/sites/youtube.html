@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Orbital Lab videos: a fictional channel page for the Feedxcavator demo</title>
+<style>
+  body { margin: 0; font: 14px/1.4 system-ui, sans-serif; background: #0f0f10; color: #f1f1f1; }
+  header { padding: 20px 24px 8px; }
+  header h1 { margin: 0; font-size: 22px; }
+  header p { margin: 4px 0 0; color: #aaa; }
+  .note { margin: 8px 24px; padding: 8px 12px; font-size: 13px; background: #3a3320; border-radius: 8px; }
+  #contents { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 24px 16px; padding: 16px 24px; }
+  ytd-rich-item-renderer { display: block; }
+  ytd-rich-item-renderer img { width: 100%; aspect-ratio: 16 / 9; border-radius: 12px; display: block; background: #222; }
+  ytd-rich-item-renderer h3 { margin: 10px 0 4px; font-size: 15px; }
+  ytd-rich-item-renderer a { color: inherit; text-decoration: none; }
+  #metadata-line { color: #aaa; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Orbital Lab</h1>
+  <p>An invented channel. Nothing on this page is real.</p>
+</header>
+<div class="note">A test page for the Feedxcavator demo: the video cards are drawn by a script, so only a browser
+  sees them.</div>
+<div id="contents"></div>
+<script>
+const VIDEOS = [
+  ['Kestrel-2: the first week in orbit', '12K views', '2 days ago', 'thumb-1.svg'],
+  ['Inside the thermal vacuum chamber', '8.4K views', '5 days ago', 'thumb-2.svg'],
+  ['Parachute drop tests, all 15 of them', '21K views', '1 week ago', 'thumb-3.svg'],
+  ['How we talk to a satellite the size of a shoebox', '33K views', '2 weeks ago', 'thumb-1.svg'],
+  ['Clean room tour, part 3', '6.1K views', '3 weeks ago', 'thumb-2.svg'],
+  ['Building the ground station antenna', '15K views', '1 month ago', 'thumb-3.svg'],
+  ['Shaker table day: will the springs survive?', '9.9K views', '1 month ago', 'thumb-1.svg'],
+  ['Q&A with the mission control team', '4.3K views', '2 months ago', 'thumb-2.svg'],
+]
+setTimeout(() => {
+  const contents = document.getElementById('contents')
+  VIDEOS.forEach(([title, views, age, thumb], i) => {
+    const id = 'olab' + String(i + 1).padStart(4, '0')
+    const item = document.createElement('ytd-rich-item-renderer')
+    item.innerHTML = `
+      <a id="thumbnail" href="/watch?v=${id}"><img alt="" src="img/${thumb}"></a>
+      <h3><a id="video-title-link" href="/watch?v=${id}"><span id="video-title"></span></a></h3>
+      <div id="metadata-line"><span>${views}</span> · <span>${age}</span></div>`
+    item.querySelector('#video-title').textContent = title
+    contents.append(item)
+  })
+}, 800)
+</script>
+</body>
+</html>
