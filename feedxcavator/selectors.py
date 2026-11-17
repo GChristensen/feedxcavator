@@ -352,7 +352,7 @@ def fix_relative_url(url, base):
         return url
     if url.startswith("//"):
         return f"{urlsplit(base).scheme or 'http'}:{url}"
-    if "://" in url or re.match(r"(?i)(data|mailto|magnet|tg|javascript):", url):
+    if re.match(r"(?i)[a-z][a-z0-9+.-]*://", url) or re.match(r"(?i)(data|mailto|magnet|tg|javascript):", url):
         return url
     return urljoin(base, url)
 

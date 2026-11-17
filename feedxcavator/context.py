@@ -13,6 +13,7 @@ task_run_id: ContextVar = ContextVar("task_run_id", default=None)
 cancel_event: ContextVar = ContextVar("cancel_event", default=None)
 log_fetch_errors: ContextVar = ContextVar("log_fetch_errors", default=False)
 stdout_capture: ContextVar = ContextVar("stdout_capture", default=None)
+deadline: ContextVar = ContextVar("deadline", default=None)  # time.monotonic() by which a feed request must end
 _fetch_state: ContextVar = ContextVar("fetch_state")
 
 
@@ -66,6 +67,7 @@ _VARS = {
     "cancel": cancel_event,
     "log_fetch": log_fetch_errors,
     "host": request_host,
+    "deadline": deadline,
 }
 
 

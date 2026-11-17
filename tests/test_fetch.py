@@ -139,12 +139,15 @@ def test_proxies_from_config(transport, monkeypatch):
     assert transport.calls[-1]["proxy"] == "http://w.test:3128"
     fetch.fetch_url("http://t.test/", proxy="code")  # proxies defined in workspace code still work
     assert transport.calls[-1]["proxy"] == "http://c.test:8080"
-    fetch.fetch_url("http://t.test/", proxy="broken")  # no port: a direct connection
-    assert transport.calls[-1]["proxy"] is None
+    calls = len(transport.calls)
+    assert fetch.fetch_url("http://t.test/", proxy="broken") is None  # no port: not usable, fails closed
+    assert isinstance(fetch.get_last_network_error(), LookupError) and len(transport.calls) == calls
     tg = telegram._proxy("default")
     assert tg["proxy_type"] == "socks5" and tg["addr"] == "127.0.0.1" and tg["port"] == 1080
     assert tg["username"] == "me" and tg["password"] == "p@ss"
-    assert telegram._proxy(None) is None and telegram._proxy("missing") is None
+    assert telegram._proxy(None) is None
+    with pytest.raises(LookupError):
+        telegram._proxy("missing")  # fails closed, as fetch_url does
 
 
 def test_telegram_proxy_choice(monkeypatch):
@@ -225,3 +228,44 @@ def test_real_request_against_local_server(http):
     assert fetch.fetch_url(http.url + "/gone") is None and fetch.get_last_http_error() == 410
     assert fetch.fetch_url("http://127.0.0.1:9/", retry=False, timeout=2000) is None
     assert fetch.get_last_network_error() is not None
+
+
+def test_undefined_proxy_fails_closed(transport, monkeypatch):
+    monkeypatch.setattr(fetch, "proxy_resolver", {}.get)
+    transport.responses = [response()]
+    assert fetch.fetch_url("http://t.test/", proxy="nope") is None
+    assert isinstance(fetch.get_last_network_error(), LookupError) and transport.calls == []
+    assert "proxy 'nope' is not defined" in LogEntry.objects.get().message  # logged even outside log_fetch_errors
+    with context.scope(feed=Feed({"fetch": {"proxy": "typo"}})):
+        assert fetch.fetch_url("http://t.test/") is None and transport.calls == []
+        assert fetch.fetch_url("http://t.test/", async_=True) is None and transport.calls == []
+        assert fetch.fetch_url("http://t.test/", proxy=False) is not None  # an explicit direct connection
+    assert len(transport.calls) == 1
+
+
+def test_no_follow_redirects_returns_the_redirect(transport):
+    transport.responses = [response(302, b"", headers={"Location": "/next"})]
+    redirect = fetch.fetch_url("http://t.test/", follow_redirects=False)
+    assert redirect.status == 302 and redirect.header("location") == "/next"
+    assert fetch.fetch_url("http://t.test/") is None and fetch.get_last_http_error() == 302  # followed: a failure
+
+
+def test_request_time_budget(transport):
+    transport.responses = [response()]
+    with context.scope(deadline=time.monotonic() + 5):
+        fetch.fetch_url("http://t.test/", timeout=30000)
+    assert transport.calls[-1]["timeout"] <= 5  # an attempt is cut to the time left
+
+    transport.calls.clear()
+    transport.responses = [response(503, headers={"Retry-After": "3"})]
+    with context.scope(deadline=time.monotonic() + 3):
+        assert fetch.fetch_url("http://t.test/") is None
+    assert len(transport.calls) == 1 and fetch.get_last_http_error() == 503  # the retry would not fit
+
+    transport.calls.clear()
+    with context.scope(deadline=time.monotonic() - 1):
+        assert fetch.fetch_url("http://t.test/") is None
+    assert transport.calls == [] and isinstance(fetch.get_last_network_error(), fetch.BudgetExceeded)
+
+    transport.responses = [response(503), response()]
+    assert fetch.fetch_url("http://t.test/") is not None  # outside a feed request nothing changes

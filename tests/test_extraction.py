@@ -313,3 +313,77 @@ def test_auto_mode(http):
     reparsed, _ = feeddef.parse_definition(f"source: {http.url}/plain\n{block}")
     again = extraction.default_feed_parser(feeddef.make_feed(reparsed, "suggested"))
     assert len(again) == 5 and again[0]["image"] == http.url + "/i/0.jpg" and again[0]["published"].year == 2024
+
+
+REL_ITEM = '<article class="post"><h2><a href="post-{n}">Title {n}</a></h2><p class="preview">S</p></article>'
+
+
+def test_links_resolve_against_the_final_url_and_base_href(http):
+    http.routes["/blog"] = (301, {"Location": "/blog/"}, "")
+    http.routes["/blog/"] = html(f"<html><body>{REL_ITEM.format(n=1)}</body></html>")
+    headlines = extraction.default_feed_parser(make_feed(http.url + "/blog"))
+    assert headlines[0]["link"] == http.url + "/blog/post-1"  # after the redirect, not http.url + "/post-1"
+
+    http.routes["/based"] = html(f'<html><head><base href="/x/"></head><body>{REL_ITEM.format(n=2)}</body></html>')
+    assert extraction.default_feed_parser(make_feed(http.url + "/based"))[0]["link"] == http.url + "/x/post-2"
+
+
+class _FakePage:
+    url = "https://b.test/final/"
+
+    def __init__(self, body):
+        self.body = body
+
+    def html(self):
+        return self.body
+
+    def text(self, selector=None):
+        return None if selector else "JSON  Raw Data  Headers"  # a viewer around the JSON
+
+    def evaluate(self, script):
+        return self.body
+
+
+class _FakeBrowser:
+    def __init__(self, calls, body, fails):
+        self.calls, self.body, self.fails = calls, body, fails
+
+    def __call__(self, profile="default", proxy=None):
+        self.calls.append(proxy)
+        return self
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+    def open(self, url, **kwargs):
+        if self.fails:
+            from feedxcavator import browser
+
+            raise browser.BrowserError("TimeoutError: page.goto: Timeout 30000ms exceeded")
+        return _FakePage(self.body)
+
+
+def test_browser_backend(monkeypatch):
+    from feedxcavator import browser
+
+    calls = []
+    body = f"<html><body>{REL_ITEM.format(n=3)}</body></html>"
+    monkeypatch.setattr(browser, "browser", _FakeBrowser(calls, body, fails=False))
+    monkeypatch.setattr(extraction.fetch, "resolve_proxy", lambda name: {"host": "p", "port": 1})
+    feed = make_feed("https://b.test/start", "fetch: {backend: browser, proxy: work}\n")
+    assert extraction.default_feed_parser(feed)[0]["link"] == "https://b.test/final/post-3"  # page.url is the base
+    assert calls == ["work"]  # the feed's proxy reaches the browser
+
+    monkeypatch.setattr(browser, "browser", _FakeBrowser(calls, body, fails=True))
+    result = extraction.run_feed(feed, "request")
+    assert result.error == "Network error." and "Network error." in result.output["output"]  # EX-3, not a 500
+
+    monkeypatch.setattr(browser, "browser", _FakeBrowser(calls, '{"items": [{"t": "J"}]}', fails=False))
+    text = ("title: J\nsuffix: j\nsource: https://b.test/api\nfetch: {backend: browser}\n"
+            "selectors:\n  item: 'jmes:items'\n  title: 'jmes:t'\n")
+    definition, _ = feeddef.parse_definition(text)
+    json_feed = feeddef.make_feed(definition, "j")
+    assert [h["title"] for h in extraction.default_feed_parser(json_feed)] == ["J"]  # read from inside the page

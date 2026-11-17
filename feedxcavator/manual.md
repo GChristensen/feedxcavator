@@ -231,6 +231,15 @@ Requests go through curl_cffi and imitate a real browser. `impersonate` names th
 by default, also `firefox`, `safari` and versioned names such as `chrome124`). Proxies are described in
 [Proxies](#proxies) and the browser backend in [Browsers](#browsers).
 
+Links in the page are made absolute against the address the page was finally served from, after redirects, or
+against its `<base href>` when it has one.
+
+A feed URL of a feed without tasks is extracted while the reader waits. That extraction has a time budget,
+`request-timeout` in `config.yml` (seconds, 50 by default): each download is cut to the time left, and retries
+that would not fit are skipped, so the reader gets the error headline instead of a timeout. When the server is
+behind a reverse proxy, keep `request-timeout` below the proxy's own limit (`proxy_read_timeout` in nginx, 60
+seconds by default). Background extraction and tests in the console have no budget.
+
 `output` selects the format: `rss` (the default), `atom`, `json-feed` or `json`. RSS, Atom and JSON Feed carry
 the standard headline fields; plain JSON keeps every field the headlines have.
 
@@ -553,7 +562,8 @@ The `as` option converts the response:
 
 Without it the raw response is returned. Other options include `method`, `headers`, `payload`, `cookies`,
 `proxy`, `retry`, `impersonate` and `timeout`, which is in milliseconds here (while `fetch.timeout` in
-`feed.yaml` is in seconds).
+`feed.yaml` is in seconds). With `follow_redirects=False` a redirect is not followed and the 3xx response is
+returned; its target is `response.header("location")`.
 
 ### Selecting elements
 
@@ -600,8 +610,9 @@ In the URL form, special characters in the user name and password must be percen
 after a restart.
 
 A fetch uses the proxy named by its `proxy` option, otherwise the one named by `fetch.proxy` of the current
-feed. `proxy=False` forces a direct connection. A name that is not defined means a direct connection, without
-an error.
+feed. `proxy=False` forces a direct connection. A name that is not defined (or a definition without a host and
+port) fails the fetch with a network error, written to the log, rather than connecting directly; the browser
+and Telegram calls refuse it too.
 
 The name `default` is not applied to feeds by itself; a feed must name it in `fetch.proxy`. Telegram calls use
 the `fetch.proxy` of the calling feed too (or their own `proxy` argument); when the feed names none, they go
@@ -696,6 +707,7 @@ The browser is set up in `config.yml`:
 | `browser-engine` | `camoufox` | `camoufox` (Firefox based), `patchright` or `playwright` |
 | `browser-channel` | `chrome` | the installed browser patchright or playwright drives; the bundled Chromium when it is missing |
 | `browser-pool-size` | `1` | how many browsers may run at once; further jobs wait |
+| `browser-wait-timeout` | `300` | seconds a job waits for a free browser (or for its profile) before failing |
 | `browser-headless` | see below | `true` or `false`; by default headful on Linux when a display or Xvfb is available, otherwise headless |
 | `browser-display` | none | Linux: the X display the worker uses when `DISPLAY` is not set, such as `":0"` |
 | `captcha-position` | none | `[x, y]`: the screen point `solve-captcha` clicks when it cannot find the Turnstile widget |

@@ -1,0 +1,4 @@
+# Line endings of the launchers (.gitattributes): shell scripts must keep LF, the batch file CRLF.
+*.sh text eol=lf
+ctl text eol=lf
+*.cmd text eol=crlf

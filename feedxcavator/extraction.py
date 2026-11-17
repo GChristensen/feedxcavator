@@ -5,10 +5,11 @@ from __future__ import annotations
 import json
 import time
 from dataclasses import dataclass, field
+from urllib.parse import urljoin
 
 from parsel import Selector
 
-from feedxcavator import applog, context, fetch, filters, output, selectors as sel, storage
+from feedxcavator import applog, conf, context, fetch, filters, output, selectors as sel, storage
 
 DEFAULT_EXTRACTOR_NAME = "default-background-extractor"
 
@@ -35,15 +36,72 @@ def _wants_json(feed) -> bool:
 def fetch_document(feed, url, useragent=None):
     """Fetches a source of a feed with its `fetch` options and parses it: a parsel selector for HTML
     and XML, parsed JSON when the item selector is JMESPath. Returns None on failure."""
+    return _fetch_document(feed, url, useragent)[0]
+
+
+def _with_base_href(document, base_url):
+    """The URL relative links of a document resolve against: its `<base href>`, if any, else `base_url`."""
+    if isinstance(document, Selector) and document.type == "html":
+        href = document.css("base::attr(href)").get()
+        if href and href.strip():
+            return urljoin(base_url, href.strip())
+    return base_url
+
+
+def _fetch_document(feed, url, useragent=None):
+    """fetch_document, also returning the URL that relative links resolve against: the final URL after
+    redirects, or the document's `<base href>`. Returns (None, url) on failure."""
+    document, base_url = _fetch_document_at(feed, url, useragent)
+    return document, (_with_base_href(document, base_url) if document is not None else url)
+
+
+_RAW_TEXT_SCRIPT = "async () => (await fetch(location.href, {credentials: 'include'})).text()"
+
+
+def _browser_json(page):
+    """The JSON a browser page shows. Browsers wrap it in viewer markup: Chromium in a <pre>, Firefox in a
+    viewer app, so when the page text does not parse, the document is read again from inside the page."""
+    for read in (page.text, lambda: page.text("pre"), lambda: page.evaluate(_RAW_TEXT_SCRIPT)):
+        try:
+            text = read()
+            if text:
+                return json.loads(text)
+        except ValueError:
+            continue
+    raise ValueError("the page is not JSON")
+
+
+def _browser_document(feed, url, opts):
+    from feedxcavator import browser
+
+    state = context.fetch_state()
+    state.reset()
+    timeout = opts.get("timeout") or 30
+    remaining = fetch.remaining_budget()
+    if remaining is not None:  # request mode: stay within `request-timeout`
+        if remaining < fetch.MIN_BUDGET:
+            state.network_error = fetch.BudgetExceeded("the request time budget is used up")
+            return None, url
+        timeout = min(timeout, remaining)
+    try:
+        with browser.browser(proxy=opts.get("proxy")) as b:
+            page = b.open(url, wait_for=opts.get("wait_for"), scroll=opts.get("scroll") or 0, timeout=timeout)
+            final_url = page.url or url
+            if _wants_json(feed):
+                return _browser_json(page), final_url
+            return Selector(text=page.html()), final_url
+    except browser.BrowserError as e:  # EX-3: reported as a network error, like a failed HTTP fetch
+        state.network_error = e
+        return None, url
+    except ValueError as e:  # the page is not JSON
+        state.conversion_error = e
+        return None, url
+
+
+def _fetch_document_at(feed, url, useragent=None):
     opts = feed.get("fetch") or {}
     if opts.get("backend") == "browser":
-        from feedxcavator import browser
-
-        context.fetch_state().reset()
-        with browser.browser() as b:
-            page = b.open(url, wait_for=opts.get("wait_for"), scroll=opts.get("scroll") or 0,
-                          timeout=opts.get("timeout") or 30)
-            return Selector(text=page.html())
+        return _browser_document(feed, url, opts)
     headers = dict(opts.get("headers") or {})
     if useragent:
         headers["User-Agent"] = useragent
@@ -56,34 +114,35 @@ def fetch_document(feed, url, useragent=None):
         timeout=(opts.get("timeout") or 30) * 1000,
     )
     if response is None:
-        return None
+        return None, url
+    final_url = response.final_url or url
     text = response.text
     try:
         if _wants_json(feed):
-            return json.loads(text)
+            return json.loads(text), final_url
         content_type = (response.content_type or "").lower()
         if "xml" in content_type and "html" not in content_type:
             document = Selector(text=text, type="xml")
             document.remove_namespaces()
-            return document
-        return Selector(text=text)
+            return document, final_url
+        return Selector(text=text), final_url
     except Exception as e:  # noqa: BLE001
         context.fetch_state().conversion_error = e
-        return None
+        return None, url
 
 
 def parse_html_page(feed, url=None, useragent=None):
     """Fetches a page (the feed source by default) and applies the feed selectors to it.
     Returns the headlines, or None when the page cannot be fetched."""
     url = url or feed.source_url
-    document = fetch_document(feed, url, useragent)
+    document, base_url = _fetch_document(feed, url, useragent)
     if document is None:
         return None
     if feed.get("mode") == "auto":
         from feedxcavator import auto
 
-        return auto.extract_from_document(feed, url, document)
-    return sel.apply_selectors(document, feed, base_url=url)
+        return auto.extract_from_document(feed, base_url, document)
+    return sel.apply_selectors(document, feed, base_url=base_url)
 
 
 def _page_url(source: str, path, n: int) -> str:
@@ -134,12 +193,12 @@ def _follow_next(feed, source, pages):
         if index and pages.get("delay"):
             time.sleep(pages["delay"])
         context.check_cancelled()
-        document = fetch_document(feed, url)
+        document, base_url = _fetch_document(feed, url)
         if document is None:
             break
         fetched_any = True
-        headlines.extend(sel.apply_selectors(document, feed, base_url=url) or [])
-        link = sel.extract_part(document, "link", pages["next"], url)
+        headlines.extend(sel.apply_selectors(document, feed, base_url=base_url) or [])
+        link = sel.extract_part(document, "link", pages["next"], base_url)
         if not link or not isinstance(link, str):
             break
         url = link
@@ -294,7 +353,9 @@ def run_feed(feed, mode: str, registry=None) -> Result:
 
     registry = registry or workspace.get_registry()
     context.new_fetch_state()
-    with context.scope(feed=feed, mode=mode):
+    # a feed URL must answer before a reverse proxy in front of the server gives up (`request-timeout`)
+    deadline = time.monotonic() + float(conf.get("request-timeout", 50)) if mode == "request" else None
+    with context.scope(feed=feed, mode=mode, deadline=deadline):
         raw, builtin = _call_extractor(feed, registry)
         state = context.fetch_state()
         http_status = state.http_error

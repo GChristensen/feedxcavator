@@ -186,6 +186,19 @@ def retry_delay_ms(backoff: int, requested: int | None) -> int:
     return jittered
 
 
+MIN_BUDGET = 1.0  # seconds: with less left of a request's time budget, no new attempt starts
+
+
+def remaining_budget() -> float | None:
+    """Seconds left of the time budget of a feed request (`request-timeout`), or None outside one."""
+    deadline = context.deadline.get()
+    return None if deadline is None else deadline - time.monotonic()
+
+
+class BudgetExceeded(TimeoutError):
+    """The time budget of a feed request (`request-timeout`) is used up."""
+
+
 def _wait(ms: int):
     event = context.cancel_event.get()
     if event is not None:
@@ -234,8 +247,9 @@ def fetch_url(url, **options):
     readable through get_last_http_error() and the other accessors.
 
     Options: method, headers, payload, `as` (html, xml, json, string, bytes; without it the raw response
-    is returned), charset, timeout (milliseconds), proxy (a proxy name, False for a direct connection),
-    follow_redirects, retry (False or a number of retries, default 2), `async` (fire and forget),
+    is returned), charset, timeout (milliseconds), proxy (a proxy name, False for a direct connection; a name
+    that is not defined fails the fetch), follow_redirects (with False a 3xx response is returned, its target
+    in `response.header("location")`), retry (False or a number of retries, default 2), `async` (fire and forget),
     insecure (skip TLS checks), impersonate (curl_cffi browser profile), cookies.
     In Python pass `as` and `async` as `as_` and `async_`."""
     opts = {}
@@ -269,8 +283,13 @@ def fetch_url(url, **options):
     proxy_name = opts.get("proxy")
     if proxy_name is not False:
         proxy_name = proxy_name or feed_fetch.get("proxy")
-        definition = resolve_proxy(proxy_name)
-        if definition:
+        if proxy_name:
+            definition = resolve_proxy(proxy_name)
+            if not definition:  # fail closed: a misspelt name must not mean a direct connection
+                name = str(getattr(proxy_name, "name", proxy_name))
+                state.network_error = LookupError(f"proxy '{name}' is not defined")
+                applog.write("error", f"Fetch error\nURL: {url}\nError: {state.network_error}")
+                return None
             proxy = proxy_url(definition)
 
     headers = dict(opts.get("headers") or {})
@@ -303,6 +322,13 @@ def fetch_url(url, **options):
 
     response, error = None, None
     for attempt in range(1, attempts + 1):
+        remaining = remaining_budget()
+        if remaining is not None:  # request mode: never run past `request-timeout`
+            if remaining < MIN_BUDGET:
+                if response is None and error is None:  # keep the failure of an earlier attempt, if any
+                    error = BudgetExceeded("the request time budget is used up")
+                break
+            request["timeout"] = min(timeout, remaining)
         response, error = None, None
         try:
             response = _transport(request)
@@ -310,7 +336,8 @@ def fetch_url(url, **options):
             raise
         except Exception as e:  # noqa: BLE001 - any transport failure is a network error
             error = e
-        if response is not None and response.status is not None and response.status < 300:
+        if response is not None and response.status is not None and (
+                response.status < 300 or (not request["follow_redirects"] and 300 <= response.status < 400)):
             try:
                 return _convert(response, as_, charset)
             except ValueError as e:
@@ -325,7 +352,11 @@ def fetch_url(url, **options):
         requested = _retry_after_ms(response) if response is not None else None
         if not failed_retryably or attempt >= attempts or (requested is not None and requested > RETRY_MAX_AFTER_MS):
             break
-        _wait(retry_delay_ms(RETRY_BASE_DELAY_MS * 2 ** (attempt - 1), requested))
+        delay = retry_delay_ms(RETRY_BASE_DELAY_MS * 2 ** (attempt - 1), requested)
+        remaining = remaining_budget()
+        if remaining is not None and remaining - delay / 1000 < MIN_BUDGET:
+            break  # the retry would not fit in the request's time budget
+        _wait(delay)
 
     if error is not None:
         state.network_error = error

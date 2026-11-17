@@ -53,9 +53,11 @@ def _proxy(name=None):
     """The Telethon proxy settings for a proxy name, None for a direct connection."""
     from feedxcavator import fetch
 
-    proxy = fetch.resolve_proxy(name) if name else None
-    if not proxy:
+    if not name:
         return None
+    proxy = fetch.resolve_proxy(name)
+    if not proxy:  # fail closed, as fetch_url does: a misspelt name must not mean a direct connection
+        raise LookupError(f"proxy '{name}' is not defined")
     schemes = {"socks5": "socks5", "socks5h": "socks5", "socks4": "socks4", "socks4a": "socks4"}
     return {
         "proxy_type": schemes.get(str(proxy.get("scheme")).lower(), "http"),

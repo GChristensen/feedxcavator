@@ -102,6 +102,8 @@ def test_helpers():
     ("./path", "https://example.com/dir/path"),
     ("path", "https://example.com/dir/path"),
     ("http://other/x", "http://other/x"),
+    ("/out?u=https://x.com/a", "https://example.com/out?u=https://x.com/a"),
+    ("item?ref=http://a", "https://example.com/dir/item?ref=http://a"),
     ("", None),
 ])
 def test_fix_relative_url(url, expected):

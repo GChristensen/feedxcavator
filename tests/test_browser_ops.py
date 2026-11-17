@@ -99,3 +99,48 @@ def test_browser_with_an_undefined_proxy_raises(monkeypatch):
     with pytest.raises(browser.BrowserError, match="not defined"):
         with browser.browser(proxy="missing"):
             pass
+
+
+class _FakeSession:
+    def __init__(self, profile, proxy=None):
+        self.profile = profile
+
+    def close(self):
+        pass
+
+
+def test_pool_wait_is_bounded_and_cancellable(monkeypatch):
+    import threading
+
+    from feedxcavator import conf, context
+
+    monkeypatch.setattr(browser, "_Session", _FakeSession)
+    monkeypatch.setattr(browser, "ensure_display", lambda: None)
+    monkeypatch.setitem(conf.config, "browser-wait-timeout", 0.3)
+    pool = browser.BrowserPool(1)
+    first = pool.acquire("a")
+    with pytest.raises(browser.BrowserError, match="browser-wait-timeout"):
+        pool.acquire("b")  # the only browser is busy
+    cancel = threading.Event()
+    cancel.set()
+    monkeypatch.setitem(conf.config, "browser-wait-timeout", 30)
+    with context.scope(cancel=cancel), pytest.raises(context.JobCancelled):
+        pool.acquire("b")  # a timed-out task run stops waiting
+    pool.release(first)
+    second = pool.acquire("b")  # the failed waits released what they had taken
+    pool.release(second)
+
+
+def test_pool_profile_wait_releases_the_slot(monkeypatch):
+    from feedxcavator import conf
+
+    monkeypatch.setattr(browser, "_Session", _FakeSession)
+    monkeypatch.setattr(browser, "ensure_display", lambda: None)
+    monkeypatch.setitem(conf.config, "browser-wait-timeout", 0.3)
+    pool = browser.BrowserPool(2)
+    first = pool.acquire("same")
+    with pytest.raises(browser.BrowserError, match="profile 'same'"):
+        pool.acquire("same")
+    other = pool.acquire("other")  # the slot taken by the failed wait was given back
+    pool.release(first)
+    pool.release(other)

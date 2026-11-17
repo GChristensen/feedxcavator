@@ -22,6 +22,9 @@ logger = logging.getLogger("feedxcavator.browser")
 
 _pool: "BrowserPool | None" = None  # set in the worker
 
+LAUNCH_TIMEOUT = 120  # seconds a browser may take to start
+DEFAULT_WAIT_TIMEOUT = 300  # seconds a job waits for a free browser (`browser-wait-timeout`)
+
 
 class BrowserError(RuntimeError):
     pass
@@ -97,7 +100,11 @@ class _Session:
         self._error = None
         self._thread = threading.Thread(target=self._run, daemon=True, name=f"browser-{self.profile}")
         self._thread.start()
-        self._ready.wait(120)
+        if not self._ready.wait(LAUNCH_TIMEOUT):
+            # the launch may still finish: tell the thread to close the browser then, and wait for it, so the
+            # profile directory is not released to another browser while this one is still starting on it
+            self._commands.put(None)
+            self._thread.join(60)
         if self._error is not None or self._context is None:
             raise BrowserError(f"failed to start the browser: {self._error or 'timeout'}")
 
@@ -326,11 +333,26 @@ class BrowserPool:
         self._profiles: dict[str, threading.Lock] = {}
         self._lock = threading.Lock()
 
+    @staticmethod
+    def _take(lock, deadline: float, what: str):
+        """Acquires a lock or semaphore, giving up when the job is cancelled or after `browser-wait-timeout`."""
+        while not lock.acquire(timeout=max(0.0, min(1.0, deadline - time.monotonic()))):
+            context.check_cancelled()
+            if time.monotonic() >= deadline:
+                wait = float(conf.get("browser-wait-timeout", DEFAULT_WAIT_TIMEOUT))
+                raise BrowserError(f"no {what} became free within {wait:g} s (browser-wait-timeout)")
+
     def acquire(self, profile: str = "default", proxy: dict | None = None) -> _Session:
         with self._lock:
             profile_lock = self._profiles.setdefault(profile, threading.Lock())
-        self._slots.acquire()
-        profile_lock.acquire()  # a profile directory can be used by one browser at a time
+        deadline = time.monotonic() + float(conf.get("browser-wait-timeout", DEFAULT_WAIT_TIMEOUT))
+        self._take(self._slots, deadline, "browser")
+        try:
+            # a profile directory can be used by one browser at a time
+            self._take(profile_lock, deadline, f"browser for profile '{profile}'")
+        except BaseException:
+            self._slots.release()
+            raise
         try:
             ensure_display()
             session = _Session(profile, proxy)
