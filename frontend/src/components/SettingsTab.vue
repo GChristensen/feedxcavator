@@ -5,7 +5,7 @@ import { api, describeError } from '../api'
 
 const store = inject('store')
 
-const form = reactive({ subscription_url: '', enable_profiling: false })
+const form = reactive({ subscription_url: '' })
 const token = ref('')
 const withWorkspace = ref(false)
 const unpackWorkspace = ref(false)
@@ -14,9 +14,7 @@ const notes = reactive({ custom: '', token: '', database: '', server: '' })
 
 async function load() {
   await store.refreshSettings()
-  form.subscription_url = store.settings.subscription_url || ''
-  form.enable_profiling = !!store.settings.enable_profiling
-}
+  form.subscription_url = store.settings.subscription_url || ''}
 
 async function save(fields, where) {
   try {
@@ -171,17 +169,6 @@ onMounted(load)
         </span>
       </div>
       <div class="row note">Workspace: {{ store.settings.workspace }}</div>
-    </fieldset>
-
-    <fieldset>
-      <legend>Logging</legend>
-      <div class="row">
-        <label style="min-width: 0">
-          <input v-model="form.enable_profiling" type="checkbox"
-                 @change="save({ enable_profiling: form.enable_profiling }, 'custom')" />
-          Enable profiling (one log entry per finished task)
-        </label>
-      </div>
     </fieldset>
 
     <div class="muted">Feedxcavator {{ store.settings.version }}</div>

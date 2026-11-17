@@ -63,8 +63,19 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 AUTH_PASSWORD_VALIDATORS = []
 
+def _local_zone_name() -> str:
+    """SCH-2: the server's local zone. On Unix Django exports TIME_ZONE as TZ and calls tzset(), which would make
+    the process (and the web and worker processes it starts) believe the local zone is whatever is set here."""
+    try:
+        from tzlocal import get_localzone_name
+
+        return get_localzone_name() or "UTC"
+    except Exception:  # noqa: BLE001
+        return "UTC"
+
+
 USE_TZ = True
-TIME_ZONE = "UTC"
+TIME_ZONE = _local_zone_name()
 USE_I18N = False
 
 # AUTH2-2

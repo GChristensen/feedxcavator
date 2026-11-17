@@ -39,7 +39,7 @@ def export_data() -> dict:
              "created_at": _iso(s.created_at)}
             for s in Subscription.objects.order_by("id")
         ],
-        "settings": [{"enable_profiling": settings.enable_profiling, "subscription_url": settings.subscription_url}],
+        "settings": [{"subscription_url": settings.subscription_url}],
         "schedulestate": [
             {"key": s.key, "first_seen_at": _iso(s.first_seen_at), "last_fired_at": _iso(s.last_fired_at)}
             for s in ScheduleState.objects.order_by("key")
@@ -104,7 +104,6 @@ def import_data(data: dict) -> dict:
         counts["subscriptions"] = len(data.get("subscriptions") or [])
         for record in (data.get("settings") or [])[:1]:
             settings = Settings.load()
-            settings.enable_profiling = bool(record.get("enable_profiling"))
             settings.subscription_url = record.get("subscription_url") or ""
             settings.save()
         counts["settings"] = min(1, len(data.get("settings") or []))

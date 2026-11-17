@@ -49,9 +49,13 @@ _xvfb = None
 
 
 def ensure_display():
-    """BRW-4: on Linux without a display, start Xvfb when it is installed so the browser can run headful."""
+    """BRW-4: on Linux without a display, use `browser-display` (an X display the worker may use, such as the
+    desktop's ":0" opened with `xhost +`), otherwise start Xvfb when it is installed, so the browser runs headful."""
     global _xvfb
     if os.name != "posix" or _is_macos() or os.environ.get("DISPLAY") or conf.get("browser-headless") is True:
+        return
+    if conf.get("browser-display"):
+        os.environ["DISPLAY"] = str(conf.get("browser-display"))
         return
     binary = shutil.which("Xvfb")
     if not binary or _xvfb is not None:
@@ -78,8 +82,10 @@ class _Session:
         self.profile = storage.sanitize_path(profile or "default").replace("/", "_").replace("\\", "_")
         self._commands: queue.Queue = queue.Queue()
         self._pages: dict[int, object] = {}
+        self._challenged: dict[int, bool] = {}  # pages whose last navigation Cloudflare answered with a challenge
         self._next_page = 1
         self._context = None
+        self._headless = True
         self._closers: list = []
         self._ready = threading.Event()
         self._error = None
@@ -93,17 +99,18 @@ class _Session:
         engine = str(conf.get("browser-engine", "patchright")).lower()
         profile_dir = conf.DATA_DIR / "browser" / self.profile
         profile_dir.mkdir(parents=True, exist_ok=True)
-        headless = _headless()
+        headless = self._headless = _headless()
         if engine == "camoufox":
             try:
-                from camoufox.sync_api import Camoufox
+                import camoufox  # noqa: F401
             except ImportError:
                 raise BrowserError("browser-engine is camoufox, but it is not installed: run "
                                    "uv pip install --python .venv/bin/python camoufox, then "
                                    ".venv/bin/python -m camoufox fetch (see the README)") from None
 
-            manager = Camoufox(persistent_context=True, user_data_dir=str(profile_dir), headless=headless)
-            self._context = manager.__enter__()
+            from feedxcavator import camoufox_identity
+
+            manager, self._context = camoufox_identity.start(profile_dir, headless)
             self._closers.append(lambda: manager.__exit__(None, None, None))
             return
         if engine == "playwright":
@@ -168,15 +175,33 @@ class _Session:
     def _page(self, page_id):
         return self._pages[page_id]
 
+    def _free_page(self):
+        """A page not in use: the blank page a persistent context starts with, or a page a job closed
+        last. Firefox (camoufox) opens each new page in a window of its own, so reusing them keeps the
+        browser at one window."""
+        used = list(self._pages.values())
+        for page in self._context.pages:
+            if page not in used and not page.is_closed():
+                return page
+        return self._context.new_page()
+
     def _op_open(self, url, wait_for=None, scroll=0, timeout=30):
-        page = self._context.new_page()
+        page = self._free_page()
         page_id = self._next_page
         self._next_page += 1
         self._pages[page_id] = page
-        page.goto(url, timeout=timeout * 1000, wait_until="domcontentloaded")
-        if wait_for:
-            page.wait_for_selector(wait_for, timeout=timeout * 1000)
-        self._op_scroll(page_id, scroll)
+        try:
+            self._navigate(page_id, url, timeout)
+            if wait_for:
+                page.wait_for_selector(wait_for, timeout=timeout * 1000)
+            self._op_scroll(page_id, scroll)
+        except BaseException:
+            # no Page object reaches the caller, so nothing would close it: free it here
+            try:
+                self._op_close_page(page_id)
+            except Exception:  # noqa: BLE001
+                self._pages.pop(page_id, None)
+            raise
         return page_id
 
     def _op_scroll(self, page_id, times=1):
@@ -200,32 +225,66 @@ class _Session:
     def _op_press(self, page_id, selector, key):
         self._page(page_id).press(selector, key)
 
-    def _op_wait_for(self, page_id, selector, timeout=30):
-        self._page(page_id).wait_for_selector(selector, timeout=timeout * 1000)
+    def _op_wait_for(self, page_id, selector, timeout=30, required=True):
+        try:
+            self._page(page_id).wait_for_selector(selector, timeout=timeout * 1000)
+        except Exception as e:
+            if required or "timeout" not in type(e).__name__.lower():
+                raise
+            return False
+        return True
 
     def _op_wait(self, page_id, seconds):
         self._page(page_id).wait_for_timeout(seconds * 1000)
 
-    def _op_evaluate(self, page_id, script):
-        return self._page(page_id).evaluate(script)
+    def _op_evaluate(self, page_id, script, arg=None):
+        return self._page(page_id).evaluate(script, arg)
+
+    def _op_screenshot(self, page_id, selector=None, type="png", quality=None, style=None, timeout=30):
+        page = self._page(page_id)
+        # scale="css": a fingerprint with devicePixelRatio 2 would double the width (and quadruple the bytes)
+        options = {"type": type, "timeout": timeout * 1000, "scale": "css", "animations": "disabled",
+                   "caret": "hide"}
+        if type == "jpeg" and quality is not None:
+            options["quality"] = int(quality)
+        if style:
+            options["style"] = style
+        if selector:
+            return page.locator(selector).first.screenshot(**options)
+        return page.screenshot(**options)
+
+    def _op_solve_captcha(self, page_id, timeout=60, attempts=2, watch=0):
+        from feedxcavator import captcha
+
+        return captcha.solve(self._page(page_id), self._headless, timeout, attempts, watch,
+                             expected=self._challenged.get(page_id, False))
+
+    def _navigate(self, page_id, url, timeout):
+        response = self._page(page_id).goto(url, timeout=timeout * 1000, wait_until="domcontentloaded")
+        self._challenged[page_id] = bool(response and response.headers.get("cf-mitigated") == "challenge")
 
     def _op_goto(self, page_id, url, wait_for=None, timeout=30):
         page = self._page(page_id)
-        page.goto(url, timeout=timeout * 1000, wait_until="domcontentloaded")
+        self._navigate(page_id, url, timeout)
         if wait_for:
             page.wait_for_selector(wait_for, timeout=timeout * 1000)
 
     def _op_close_page(self, page_id):
         page = self._pages.pop(page_id, None)
-        if page is not None:
+        self._challenged.pop(page_id, None)
+        if page is None:
+            return
+        if len([p for p in self._context.pages if not p.is_closed()]) > 1:
             page.close()
+        else:  # the last page: keep its window for the next open
+            page.goto("about:blank")
 
     def _op_cookies(self, url=None):
         cookies = self._context.cookies(url) if url else self._context.cookies()
         return {c["name"]: c["value"] for c in cookies}
 
     def _op_user_agent(self):
-        page = next(iter(self._pages.values()), None) or self._context.new_page()
+        page = next(iter(self._pages.values()), None) or self._free_page()
         return page.evaluate("navigator.userAgent")
 
 
@@ -314,8 +373,10 @@ class Page:
     def press(self, selector, key):
         self._call("press", selector, key)
 
-    def wait_for(self, selector, timeout=30):
-        self._call("wait_for", selector, timeout)
+    def wait_for(self, selector, timeout=30, required=True) -> bool:
+        """Waits for an element matching `selector`, through navigations (such as the reload a security check
+        does once passed). On a timeout it raises, or with `required=False` returns False."""
+        return self._call("wait_for", selector, timeout, required)
 
     def wait(self, seconds):
         self._call("wait", seconds)
@@ -323,8 +384,25 @@ class Page:
     def scroll(self, times=1):
         self._call("scroll", times)
 
-    def evaluate(self, script):
-        return self._call("evaluate", script)
+    def evaluate(self, script, arg=None):
+        """Runs a JavaScript expression in the page and returns its value. When the expression is a function,
+        it is called with `arg` (JSON-like data)."""
+        return self._call("evaluate", script, arg)
+
+    def screenshot(self, selector=None, type="png", quality=None, style=None, timeout=30) -> bytes:
+        """The first element matching `selector`, or the viewport without one, as image bytes. Playwright
+        scrolls the element into view first. `type` is "png" or "jpeg" (with `quality` 0-100); `style` is CSS
+        applied only while the shot is taken, for example to hide fixed headers lying over the element."""
+        return self._call("screenshot", selector, type, quality, style, timeout)
+
+    def solve_captcha(self, timeout=60, attempts=2, watch=0) -> bool:
+        """BRW-8: passes a Cloudflare challenge on the page with the system mouse, if there is one. True when
+        the page is through. `watch` is how many seconds to keep looking for a challenge that has not shown yet
+        (it returns as soon as one does). Needs a headful browser, pyautogui and the display the browser is on."""
+        solved = self._call("solve_captcha", timeout, attempts, watch)
+        if solved:
+            self._owner._hand_over(self.url)
+        return solved
 
     def text(self, selector=None):
         document = self.selector()

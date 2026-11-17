@@ -119,6 +119,6 @@ directory, `handlers/`, then `tasks.yaml` and `schedules.yaml`.
 
 - AUTO-5 (LLM selector suggestion) and schema-driven autocompletion are not implemented.
 - Telegram has not been run against a real account.
-- Linux specifics (Xvfb, the systemd unit, `feedxcavator.sh`), PostgreSQL, the Camoufox engine and the worker
-  REPL are written but untested.
+- Linux specifics (Xvfb, the systemd unit, `feedxcavator.sh`), PostgreSQL and the worker REPL are written but
+  untested.
 - The research evaluations R-1 to R-4 were not run; the README lists the choices made instead.

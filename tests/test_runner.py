@@ -7,7 +7,7 @@ from django.utils import timezone
 
 from conftest import html
 from feedxcavator import conf, maintenance, storage, worker
-from feedxcavator.models import Blob, FeedRun, LogEntry, QueueItem, ScheduleState, Settings, TaskRun
+from feedxcavator.models import Blob, FeedRun, LogEntry, QueueItem, ScheduleState, TaskRun
 from feedxcavator.runner import TaskRunner
 
 PAGE = '<article><h2>T{n}</h2><a href="/p/{n}">l</a></article>'
@@ -87,7 +87,6 @@ def test_task_run_order_and_records(http, ws, runner):
                       "    then: [after]\n  after: {call: job}\n",
     }, startup=True)
     assert registry.errors == []
-    Settings.objects.update_or_create(id=1, defaults={"enable_profiling": True})
     run = runner.run("morning", "manual")
     assert runner.wait_idle(10)
     assert run.status == "ok"
@@ -108,16 +107,6 @@ def test_task_run_order_and_records(http, ws, runner):
     assert storage.fetch_feed_output(registry.feeds["empty"].key) is None
 
     assert LogEntry.objects.filter(source="boom", level="error").count() == 1  # the logging source
-    profiling = LogEntry.objects.filter(source="profiling").order_by("id")
-    # a supertask logs only its name and total time, as in 3.0.0; feeds appear in their subtask's entry
-    morning_entry = next(e for e in profiling if e.message.startswith("Supertask: morning"))
-    assert morning_entry.level == "info" and " - " not in morning_entry.message
-    assert morning_entry.message.splitlines()[1].startswith("Total execution time: ")
-    articles_entry = next(e for e in profiling if e.message.startswith("Task: articles"))
-    assert articles_entry.level == "warning"  # a feed returned zero headlines (TSK-9)
-    assert " - empty: " in articles_entry.message and " - a: " not in articles_entry.message
-    news_entry = next(e for e in profiling if e.message.startswith("Task: news"))
-    assert news_entry.level == "info" and " - a: " in news_entry.message
 
 
 def test_pre_and_post_outcomes(http, ws, runner):

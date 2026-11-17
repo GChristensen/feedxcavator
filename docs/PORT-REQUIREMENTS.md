@@ -472,6 +472,11 @@ BRW-6. Browser processes are child processes for LFC-3 and LFC-4.
 
 BRW-7. INT-2 (the headless HTTP client with optional JS) is replaced by BRW-1 to BRW-5.
 
+BRW-8. A Cloudflare challenge on a browser page can be passed with the system pointer (`page.solve_captcha()`,
+`solve-captcha`), replacing the external `cf-captcha.py` script of crawlerext. The pointer makes random moves within
+the screen less a 15% margin, then clicks the Turnstile checkbox, located from the widget's box in the page and mapped
+to the screen by a calibration move. Fixed screen coordinates are only a configured fallback.
+
 ### 9.3 Telegram
 
 TG-1. Telegram support is required (D-10). INT-3 applies in full: `telegram.get_channel_messages(channel)` returns
@@ -691,7 +696,7 @@ STO-6 still apply.
 STO2-12. **LogEntry**: autoincrement `id` (the sequence number of LOG-2, replacing the counter entity), `level`,
 `source`, `timestamp`, `message`, optional `task_run`. Indexed on `timestamp`, `level`, and `source`.
 
-STO2-13. **Settings**: a single row with `enable_profiling`, `subscription_url`. `user_email` is dropped (§17.16).
+STO2-13. **Settings**: a single row with `subscription_url`. `user_email` and `enable_profiling` are dropped (§17.16, TSK2-8).
 
 STO2-14. **ApiToken**: the token is stored hashed. The console shows it once when generated (changes AUTH-6 and
 API-16).

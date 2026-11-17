@@ -42,20 +42,26 @@ fi
 
 echo "Camoufox starting with $profile_dir; close its window to finish"
 
-"$python" - "$profile_dir" "$url" <<'EOF'
+"$python" - "$profile_dir" "$url" "$script_dir" <<'EOF'
 import sys
 
+sys.path.insert(0, sys.argv[3])
+from feedxcavator import camoufox_identity
+
 try:
-    from camoufox.sync_api import Camoufox
+    import camoufox  # noqa: F401
 except ImportError:
     sys.exit("camoufox is not installed: install it into the virtual environment, "
              "then run: python -m camoufox fetch (see the README)")
 
 profile_dir, url = sys.argv[1], sys.argv[2]
 
-with Camoufox(persistent_context=True, user_data_dir=profile_dir, headless=False) as context:
+manager, context = camoufox_identity.start(profile_dir, headless=False)
+try:
     page = context.pages[0] if context.pages else context.new_page()
     if url:
         page.goto(url)
     context.wait_for_event("close", timeout=0)
+finally:
+    manager.__exit__(None, None, None)
 EOF

@@ -1,3 +1,5 @@
+import pytest
+
 from feedxcavator import feeddef, workspace
 from feedxcavator.models import FeedIndex, LogEntry
 
@@ -172,6 +174,30 @@ def test_hy_dsl(ws):
     assert result["keep"] == [2, 3] and result["mapcat"] == [1, 1, 2, 2]
     assert result["partition"] == [[1, 2], [3, 4]] and result["group"] == {1: [1, 3], 0: [2]}
     assert result["freq"] == {"a": 2, "b": 1} and result["safe"] is None and result["repeat"] is None
+
+
+def test_load_js_reads_next_to_the_calling_file(ws):
+    registry = ws({
+        "feeds/group/lib/shared.hy": '(defn shared-js [] (load-js "common"))\n',
+        "feeds/group/lib/common.js": "const main = () => 2;",
+        "feeds/group/item/feed.yaml": "title: Item\nsuffix: item\nsource: https://e.test/\n",
+        "feeds/group/item/extract.hy": ('(defn own-js [] (load-js "cards.js"))\n'
+                                        '(defn raw-js [] (load-js "cards" :wrap False))\n'
+                                        '(defn via-lib [] (shared-js))\n'
+                                        '(defn escape [] (load-js "../../../../x.js"))\n'
+                                        '(defn no-main [] (load-js "plain"))\n'),
+        "feeds/group/item/cards.js": "function main() { return 42; } // done",
+        "feeds/group/item/plain.js": "42",
+    }, startup=True)
+    assert registry.errors == []
+    ns = registry.namespace
+    assert ns["own_js"]() == "async (arg) => {\nfunction main() { return 42; } // done\nreturn await main(arg);\n}"
+    assert ns["raw_js"]() == "function main() { return 42; } // done"
+    assert "const main = () => 2;" in ns["via_lib"]()  # next to the group lib that calls it, not the feed
+    with pytest.raises(ValueError, match="does not define a main function"):
+        ns["no_main"]()
+    with pytest.raises(ValueError, match="outside the workspace"):
+        ns["escape"]()
 
 
 def test_hy_selector_literal_is_checked_at_load(ws):

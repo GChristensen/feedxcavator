@@ -300,6 +300,12 @@ with browser() as b:
       (.apply-selectors feed)))
 ```
 
+Sites behind a security check (DDoS-Guard, a bot check of their own) show the content only after the check passes
+and reloads the page, which can take ten seconds or more. Wait for the content rather than for a fixed time:
+`page.wait_for(selector, timeout, required=False)` keeps waiting through the reload and returns False on a timeout
+instead of raising, so the code can reload once or give up. The clearance cookies stay in the profile, so usually only
+the first page of a run waits.
+
 The browser is set up in `config.yml`:
 
 | Key | Default | Meaning |
@@ -308,6 +314,9 @@ The browser is set up in `config.yml`:
 | `browser-channel` | `chrome` | the installed browser patchright or playwright drives; the bundled Chromium when it is missing |
 | `browser-pool-size` | `1` | how many browsers may run at once; further jobs wait |
 | `browser-headless` | see below | `true` or `false`; by default headful on Linux when a display or Xvfb is available, otherwise headless |
+| `browser-display` | none | Linux: the X display the worker uses when `DISPLAY` is not set, such as `":0"` |
+| `captcha-position` | none | `[x, y]`: the screen point `solve-captcha` clicks when it cannot find the Turnstile widget |
+| `captcha-flash` | `false` | `solve-captcha` shows a marker at each point the pointer moves to |
 
 Browsers run in the worker; code in the web process (the console) reaches them over the local RPC. Each
 `with browser()` block starts a browser and closes it at the end.
@@ -322,6 +331,27 @@ open the profile headful (`browser-headless: false`), log in by hand, and later 
 After a page is opened, later `fetch_url` calls to the same host reuse the browser's cookies and user agent
 (kept in memory by the process until it restarts), so a browser can pass a challenge and plain fetches can do
 the rest.
+
+#### Cloudflare challenges
+
+`(solve-captcha url :profile "default")` opens a page in a pool browser and passes a Cloudflare challenge on it
+(the "Just a moment..." page or a Turnstile checkbox); in an open browser, `(.solve-captcha page)` does the same
+for that page. Both return `True` when the page is through. Turnstile ignores clicks the browser driver makes,
+so the real pointer is moved and clicked with pyautogui: three moves to random points at least 15% of the screen
+away from its edges, then a click on the checkbox, and a second try when the challenge stays. The checkbox is
+found in the page, not at fixed screen coordinates: its place comes from the widget's box, and page coordinates
+are mapped to the screen by moving the pointer over the page and reading where the page saw it.
+`captcha-position` is the fallback when no widget is found. One solve runs at a time, since there is one pointer.
+
+This needs a headful browser on a display the worker can reach, with the window not covered by others:
+
+```
+uv pip install --python .venv/bin/python "pyautogui>=0.9.54"     # Windows: --python .venv\Scripts\python
+```
+
+On Linux, when the worker runs as another user than the desktop session, allow it on the desktop display with
+`xhost +` (or `xhost +SI:localuser:<user>`) and set `browser-display: ":0"`. Under Xvfb the clicks work too,
+but nobody can watch them. Set `captcha-flash: true` to see where the pointer acts while checking a setup.
 
 The browser does not use the proxies defined above: `fetch.proxy` has no effect on `fetch.backend: browser`.
 Engine and channel are global; profiles cannot set their own.
@@ -597,6 +627,11 @@ Notes:
   by hand. It works for the patchright and playwright engines only. Close it before the worker uses the profile.
 - `firefox-profile.sh [profile] [url]` does the same for the camoufox engine: it starts Camoufox through the
   camoufox package in the venv and waits until its window is closed.
+- With camoufox, each profile keeps one fingerprint for the host's OS in
+  `data/browser/<profile>/feedxcavator-fingerprint.json`, created on the first launch, so the sign-in script and
+  the worker present the same browser. The file also keeps the host GPU that Camoufox reads by starting a bare
+  browser for a moment (a short extra window), so this happens once per profile, normally in
+  `firefox-profile.sh`. Delete the file to get a new identity, or after changing the machine's graphics.
 
 The server can be restarted from the Settings tab when it runs under the supervisor or the systemd unit.
 Child processes (browsers) are stopped on shutdown. When the server is killed forcibly, the children it left

@@ -222,7 +222,6 @@ class Command(BaseCommand):
 
         for record in (data.get("settings") or [])[:1]:
             settings = Settings.load()
-            settings.enable_profiling = bool(record.get("enable-profiling"))
             settings.subscription_url = record.get("subscription-url") or ""
             settings.save()
 

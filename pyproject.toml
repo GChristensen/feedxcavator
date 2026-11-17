@@ -40,6 +40,7 @@ dependencies = [
 
 [project.optional-dependencies]
 camoufox = ["camoufox>=0.4"]
+captcha = ["pyautogui>=0.9.54"]
 postgres = ["psycopg[binary]>=3.1"]
 dev = ["pytest>=8"]
 

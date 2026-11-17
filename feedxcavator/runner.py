@@ -22,11 +22,6 @@ class TaskContext(dict):
     __getattr__ = dict.get
 
 
-def _millis(seconds: float) -> str:
-    minutes, rest = divmod(seconds, 60)
-    return (f"{int(minutes)}m " if minutes else "") + f"{rest:.1f}s"
-
-
 class TaskRunner:
     def __init__(self, parallel: int | None = None, sequential: int | None = None):
         self.parallel = ThreadPoolExecutor(int(parallel or conf.get("worker-parallel", 6)), "feed-parallel")
@@ -200,7 +195,7 @@ class TaskRunner:
         if call_future is not None and call_future.done() and not call_future.cancelled():
             call_error = call_future.exception()
 
-        # results of this run and of its subtasks, for post and profiling
+        # results of this run and of its subtasks, for post
         run_ids = [run.id] + self._descendant_ids(run.id)
         records = list(FeedRun.objects.filter(task_run_id__in=run_ids).order_by("id"))
         results = [
@@ -210,8 +205,6 @@ class TaskRunner:
             for r in records
         ]
         ctx["results"] = results
-        # profiling lists only this run's own feeds; each subtask writes its own entry
-        own_results = [res for res, r in zip(results, records) if r.task_run_id == run.id]
 
         status, error = ("timeout", "the task run timed out") if timed_out else ("ok", "")
         if call_error is not None:
@@ -225,10 +218,8 @@ class TaskRunner:
             if failure:
                 with context.scope(source=task.name, task_run=run.id):
                     applog.write("error", f"post of task {task.name} failed: {failure}")
-                self._profile(task, run, own_results, started)
                 return finish("failed", f"post: {failure}")
 
-        self._profile(task, run, own_results, started)
         finish(status, error)
         for name in task.then:  # TSK2-4
             self.enqueue(name, "then")
@@ -306,29 +297,6 @@ class TaskRunner:
             finally:
                 connection.close()
         return count
-
-    @staticmethod
-    def _profile(task, run, results, started):
-        """TSK-9, kept as one log entry per finished task when profiling is enabled. `results` are the
-        task's own feeds only. A task with subtasks is headed "Supertask:" as in 3.0.0; its subtasks'
-        feeds appear in their own entries, so a supertask without own feeds logs just its total time."""
-        from feedxcavator.models import Settings
-
-        try:
-            if not Settings.load().enable_profiling:
-                return
-        except Exception:  # noqa: BLE001
-            return
-        heading = "Supertask" if task.run else "Task"
-        lines = [f"{heading}: {task.name}", f"Total execution time: {_millis(time.monotonic() - started)}"]
-        healthy = True
-        for r in results:
-            elapsed = _millis(r["elapsed"]) if r["elapsed"] is not None else "N/D"
-            lines.append(f" - {r['title']}: {elapsed}, {r['headline_count'] or 0} headlines")
-            if not r["headline_count"] and not r["expect_empty"]:
-                healthy = False
-        with context.scope(source="profiling", task_run=run.id):
-            applog.write("info" if healthy else "warning", "\n".join(lines))
 
     def shutdown(self):
         self.parallel.shutdown(wait=False, cancel_futures=True)

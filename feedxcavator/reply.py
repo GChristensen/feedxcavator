@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import json
 
-from django.http import HttpResponse, HttpResponseRedirect
+from django.http import HttpResponse
+from django.utils.encoding import iri_to_uri
 
 
 def web_page(content_type, body):
@@ -46,7 +47,11 @@ def attachment_page(filename, body):
 
 def redirect_to(location):
     """A 302 redirect."""
-    return HttpResponseRedirect(location)
+    # Like Ring's redirect, any Location is sent as is. Django's HttpResponseRedirect refuses schemes other than
+    # http, https and ftp, which breaks links to custom schemes (ext+jb://...) that feeds use.
+    response = HttpResponse(status=302)
+    response["Location"] = iri_to_uri(str(location))
+    return response
 
 
 def no_content():

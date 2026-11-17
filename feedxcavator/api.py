@@ -80,7 +80,8 @@ def rel(path: Path) -> str:
 
 def language(name: str) -> str:
     return {".yaml": "yaml", ".yml": "yaml", ".py": "python", ".hy": "hy", ".clj": "clojure", ".json": "json",
-            ".xml": "xml", ".md": "markdown"}.get(Path(name).suffix, "text")
+            ".xml": "xml", ".md": "markdown", ".js": "javascript", ".html": "html",
+            ".css": "css"}.get(Path(name).suffix, "text")
 
 
 def load_report(registry=None) -> dict:
@@ -986,7 +987,6 @@ def delete_wordfilter(request, name: str):
 
 
 class SettingsIn(Schema):
-    enable_profiling: bool | None = None
     subscription_url: str | None = None
 
 
@@ -999,7 +999,7 @@ def get_settings(request):
     settings = Settings.load()
     token = ApiToken.objects.order_by("-id").first()
     return {
-        "enable_profiling": settings.enable_profiling, "subscription_url": settings.subscription_url,
+        "subscription_url": settings.subscription_url,
         "version": VERSION, "restartable": conf.supervised(),
         "token_created_at": token.created_at.isoformat() if token else None,
         "images": Blob.objects.count(), "worker_alive": rpc.worker_alive(),
@@ -1014,8 +1014,6 @@ def save_settings(request, data: SettingsIn):
     from feedxcavator.models import Settings
 
     settings = Settings.load()
-    if data.enable_profiling is not None:
-        settings.enable_profiling = data.enable_profiling
     if data.subscription_url is not None:
         settings.subscription_url = data.subscription_url.strip()
     settings.save()

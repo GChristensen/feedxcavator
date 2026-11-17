@@ -24,7 +24,7 @@ const PRELUDE_FUNCTIONS = [
   'extract', 'q', 'q1', 'parse-html', 'assoc', 'dissoc', 'update', 'get-in', 'assoc-in', 'update-in', 'merge',
   'select-keys', 'distinct-by', 'keep', 'mapcat', 'partition', 'partition-all', 'group-by', 'frequencies',
   'text-page', 'html-page', 'json-page', 'rss-page', 'redirect-to', 'fix-relative-url', 'redirect-url',
-  'forward-url', 'get-feed-url', 'print', 'len', 'str', 'int', 'float', 'list', 'dict', 'set', 'tuple', 'range',
+  'forward-url', 'get-feed-url', 'load-js', 'solve-captcha', 'print', 'len', 'str', 'int', 'float', 'list', 'dict', 'set', 'tuple', 'range',
   'map', 'filter', 'sorted', 'reversed', 'enumerate', 'zip', 'isinstance', 'getattr', 'setattr', 'hasattr',
 ].join('|')
 

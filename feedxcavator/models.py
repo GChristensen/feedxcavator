@@ -141,7 +141,6 @@ class LogEntry(models.Model):
 class Settings(models.Model):
     """STO2-13. A single row with id 1."""
 
-    enable_profiling = models.BooleanField(default=False)
     subscription_url = models.CharField(max_length=2048, blank=True, default="")
 
     @classmethod

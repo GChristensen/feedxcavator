@@ -154,6 +154,11 @@ def test_redirect_and_forward(http, ws, client):
     encoded = base64.urlsafe_b64encode(target.encode()).decode().rstrip("=")
     assert client.get(f"/redirect-b64/abc/{encoded}")["Location"] == target
     assert client.get("/redirect/abc/javascript%3Aalert(1)").status_code == 404
+    assert client.get("/redirect/abc/not-a-url").status_code == 404
+    custom = "ext+jb://main#0f9e"  # custom schemes pass through, as with Ring
+    assert client.get(f"/redirect/_/{quote(custom, safe='')}")["Location"] == custom
+    custom_b64 = base64.urlsafe_b64encode(custom.encode()).decode().rstrip("=")
+    assert client.get(f"/redirect-b64/_/{custom_b64}")["Location"] == custom
 
     http.routes["/media"] = lambda h: (200, {"Content-Type": "video/mp4", "X-Seen-Referer": h.headers.get("Referer", "")},
                                        b"media-bytes")
@@ -167,6 +172,8 @@ def test_redirect_and_forward(http, ws, client):
     from feedxcavator import userlib
 
     assert userlib.redirect_url_b64(target).startswith("http://feeds.test/redirect-b64/")
+    assert userlib.forward_url(upstream, None).endswith("&referer=")  # None is no referer, not "None"
+    assert userlib.url_safe_base64dec(userlib.forward_url_b64(upstream, None).rsplit("/", 1)[1]).endswith(";;")
     assert f"/forward-b64/{data}" in userlib.forward_url_b64(upstream, "https://b64.test/")
 
 

@@ -230,6 +230,7 @@ def forward_url(url, referer, https=False, proxy=None):
     """A link to this server that fetches `url` with the given Referer (and proxy) and returns the
     result. Used for media that needs a specific referer."""
     host = conf.secure_host() if https else get_app_host()
+    referer = referer or ""
     link = f"{host}/forward/{generate_random(10)}/?url={url_encode_utf8(url)}&referer={url_encode_utf8(referer)}"
     return link + (f"&proxy={url_encode_utf8(proxy)}" if proxy else "")
 
@@ -237,7 +238,7 @@ def forward_url(url, referer, https=False, proxy=None):
 def forward_url_b64(url, referer, https=False, proxy=None):
     """As forward_url, with the target and referer Base64-encoded."""
     host = conf.secure_host() if https else get_app_host()
-    link = f"{host}/forward-b64/{url_safe_base64enc(f'{url};;{referer}')}"
+    link = f"{host}/forward-b64/{url_safe_base64enc(f'{url};;{referer or ""}')}"
     return link + (f"?proxy={url_encode_utf8(proxy)}" if proxy else "")
 
 
@@ -445,10 +446,54 @@ telegram = _Telegram()
 def browser(profile="default"):
     """with browser(profile="default") as b: opens a stealth browser from the worker's pool.
     b.open(url, wait_for=None, scroll=0) returns a page with html(), apply_selectors(feed), click(),
-    fill(), wait_for(), evaluate(), text(), url and cookies()."""
+    fill(), wait_for(selector, timeout, required=True) (False on a timeout when not required), evaluate(script, arg), screenshot(selector), solve_captcha(), text(), url and
+    cookies()."""
     from feedxcavator import browser as _browser
 
     return _browser.browser(profile)
+
+
+def solve_captcha(url, profile="default", timeout=60, watch=10):
+    """(solve-captcha url :profile "default"): opens `url` in a pool browser and passes a Cloudflare challenge
+    there with the system mouse, so later visits with the profile (and fetch_url calls to the host) get through.
+    A challenge may show up some time after the page opens: `watch` is how long to wait for one. True when the
+    page is through. In an open browser, page.solve_captcha(watch=...) does the same on that page."""
+    with browser(profile) as b:
+        page = b.open(url, timeout=timeout)
+        try:
+            return page.solve_captcha(timeout, watch=watch)
+        finally:
+            page.close()
+
+
+def load_js(name, wrap=True):
+    """(load-js "cards"): a script for page.evaluate() from a file in the directory of the workspace file that
+    calls it. ".js" is added to a name without a suffix. The file defines `function main()` (or
+    `async function main(arg)`); evaluate() returns what main returns, and `(.evaluate page js arg)` passes
+    `arg` to main. The file runs in a function scope of its own, so its names do not leak into the page. Names
+    it sets on `window` persist between calls on the same page. `:wrap False` returns the file as is. The file is read at
+    each call, so edits apply without a workspace reload (the workspace does not watch .js files)."""
+    from pathlib import Path
+
+    caller = inspect.currentframe().f_back.f_code.co_filename  # workspace files compile under their relative path
+    root = conf.workspace_dir().resolve()
+    caller_path = Path(caller)
+    if caller_path.is_absolute() or caller.startswith("<"):
+        raise ValueError(f"load-js: called from {caller}, which is not a workspace file")
+    name = str(name)
+    if not Path(name).suffix:
+        name += ".js"
+    target = (root / caller_path.parent / name).resolve()
+    if not target.is_relative_to(root):
+        raise ValueError(f"load-js: {name} is outside the workspace")
+    code = target.read_text(encoding="utf-8")
+    if not wrap:
+        return code
+    if not re.search(r"\bfunction\s+main\s*\(|\b(?:const|let|var)\s+main\s*=", code):
+        raise ValueError(f"load-js: {name} does not define a main function")
+    # the newline after the code ends a // comment on the last line of the file
+    # a function expression: Playwright calls it with evaluate's arg
+    return f"async (arg) => {{\n{code}\nreturn await main(arg);\n}}"
 
 
 class _Log:
@@ -462,7 +507,7 @@ log = _Log()
 CATEGORIES = [
     ("Registration", [extractor, handler, task_function, proxy]),
     ("Fetching", [fetch.fetch_url, fetch.get_last_http_response, fetch.get_last_http_error,
-                  fetch.get_last_network_error, fetch.get_last_conversion_error, fetch.log_fetch_errors, browser]),
+                  fetch.get_last_network_error, fetch.get_last_conversion_error, fetch.log_fetch_errors, browser, solve_captcha, load_js]),
     ("Selectors", [sel.q, sel.q1, sel.text, sel.attr, sel.inner_html, sel.outer_html, sel.extract,
                    sel.apply_selectors, parse_html, html_render, html_unescape, html_sanitize, html_untag,
                    sel.parse_date]),

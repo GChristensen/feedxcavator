@@ -39,10 +39,13 @@ worker-sequential: 1             # workers for feeds with parallel: false
 run-history-days: 30             # task and feed run records are pruned after this many days
 
 # Browser automation (used only by feeds with fetch.backend: browser and by browser() in code)
-browser-engine: patchright       # patchright | camoufox | playwright
+browser-engine: camoufox         # patchright | camoufox | playwright
 browser-channel: chrome          # the installed browser patchright drives; falls back to its bundled Chromium
 browser-pool-size: 1
 #browser-headless: false         # default: headful when a display or Xvfb is available on Linux, else headless
+#browser-display: ":0"           # Linux: the X display for browsers and captcha clicks (run xhost + on it first)
+#captcha-position: [373, 424]    # solve-captcha: screen point to click when the Turnstile widget is not found
+#captcha-flash: false            # solve-captcha: show a marker where the pointer acts, to check coordinates
 
 # Proxies, referred to by name from fetch.proxy in feed.yaml and the proxy option of fetch_url.
 # Telegram uses the one named default. Schemes: http, https, socks5, socks5h, socks4.

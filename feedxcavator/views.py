@@ -323,14 +323,28 @@ def _raw_tail(request, prefix_parts: int) -> str:
     return path.lstrip("/").split("/", prefix_parts)[-1]
 
 
+_SCHEME_RE = re.compile(r"([a-z][a-z0-9+.-]*):", re.IGNORECASE)
+_SCRIPT_SCHEMES = {"javascript", "vbscript", "data"}
+
+
+def _redirect_target(target):
+    """A 302 to `target` when it is an absolute URL of any scheme (feeds link to custom ones such as
+    `ext+jb://`, which Ring passed through), except script-bearing schemes."""
+    match = _SCHEME_RE.match(target)
+    if not match or match.group(1).lower() in _SCRIPT_SCHEMES:
+        return reply.page_not_found()
+    return reply.redirect_to(target)
+
+
 @csrf_exempt
 async def redirect(request, random, url):
     """API-30."""
     target = unquote(_raw_tail(request, 2))
     query = request.META.get("QUERY_STRING")
-    if query and "?" not in target:
-        target = f"{target}?{query}"
-    return HttpResponseRedirect(target) if re.match(r"https?://", target) else reply.page_not_found()
+    if query and "?" not in target:  # an unencoded target: the server split its query off
+        base, hash_, fragment = target.partition("#")
+        target = f"{base}?{query}{hash_}{fragment}"
+    return _redirect_target(target)
 
 
 @csrf_exempt
@@ -340,7 +354,7 @@ async def redirect_b64(request, random, data):
         target = base64.urlsafe_b64decode(data + "=" * (-len(data) % 4)).decode("utf-8")
     except (ValueError, UnicodeDecodeError):
         return reply.page_not_found()
-    return HttpResponseRedirect(target) if re.match(r"https?://", target) else reply.page_not_found()
+    return _redirect_target(target)
 
 
 _HOP_HEADERS = {"connection", "keep-alive", "proxy-authenticate", "proxy-authorization", "te", "trailers",

@@ -38,6 +38,9 @@ DEFAULTS = {
     "browser-headless": None,  # None: headful when a display (or Xvfb) is available, else headless
     "browser-engine": "patchright",  # patchright | camoufox | playwright
     "browser-channel": "chrome",
+    "browser-display": None,  # Linux: an X display for the browser (and captcha clicks) when DISPLAY is unset
+    "captcha-position": None,  # [x, y]: screen point solve-captcha clicks when it finds no Turnstile widget
+    "captcha-flash": False,  # show a marker where solve-captcha moves the pointer
     "run-history-days": 30,
 }
 
