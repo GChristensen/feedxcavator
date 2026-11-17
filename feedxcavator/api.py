@@ -215,12 +215,55 @@ def write_file(request, data: FileIn):
     problems = diagnostics_for(path, data.content)
     if problems:  # FD2-4: nothing is stored
         raise ApiError(400, "validation failed", diagnostics=problems)
+    change = _suffix_change(target, data.content)
+    if change is not None:
+        check_suffix_free(change[0], change[1])
     storage.write_atomic(target, data.content)
+    renamed = None
+    if change is not None:
+        info, suffix = change
+        renamed = {"from": info.suffix, "to": suffix, "moved": None}
+        if not info.id:  # the state is kept under the suffix
+            renamed["moved"] = storage.rename_feed_state(info.key, suffix)
     report = reload()
     live = workspace.get_registry()
     related = [e for e in report["errors"] if e["path"] == path or e["path"].startswith(path.rsplit("/", 1)[0] + "/")]
     return {"path": path, "mtime": target.stat().st_mtime, "load": report, "file_errors": related,
-            "feed": next((i.as_dict() for i in live.feeds.values() if path.startswith(i.dir + "/")), None)}
+            "feed": next((i.as_dict() for i in live.feeds.values() if path.startswith(i.dir + "/")), None),
+            "renamed": renamed}
+
+
+def _suffix_change(target: Path, content: str):
+    """The loaded feed and its new suffix when saving `content` to its feed.yaml changes the suffix
+    (set, edited or removed, so that the directory name applies), else None. A save that also sets or
+    changes the id is left alone: the key changes with the id, so there is no state to carry over."""
+    if target.name != "feed.yaml" or not rel(target).startswith("feeds/"):
+        return None
+    feed_dir = rel(target.parent)
+    info = next((i for i in workspace.get_registry().feeds.values() if i.dir == feed_dir), None)
+    if info is None or not info.suffix:
+        return None  # not loaded: nothing is stored under a known key
+    try:
+        definition, _ = feeddef.parse_definition(content, workspace.template_loader(root(), target.parent))
+    except feeddef.DefinitionError:
+        return None
+    feed = feeddef.make_feed(definition, target.parent.relative_to(root() / "feeds").as_posix())
+    suffix = feed["suffix"]
+    if suffix == info.suffix or (feed.get("id") or None) != (info.id or None):
+        return None
+    if not feeddef.SUFFIX_RE.fullmatch(suffix):
+        return None  # the load reports it
+    return info, suffix
+
+
+def check_suffix_free(info, suffix: str):
+    registry = workspace.get_registry()
+    clash = next((i for i in registry.feeds.values()
+                  if i is not info and (i.suffix or "").lower() == suffix.lower()), None)
+    if clash is not None:
+        raise ApiError(409, f"suffix '{suffix}' is already used by {clash.dir}")
+    if any(i is not info and i.id == suffix for i in registry.feeds.values()):
+        raise ApiError(409, f"'{suffix}' is the id of another feed")
 
 
 @api.post("/file/validate")
@@ -342,12 +385,7 @@ def rename_suffix(request, data: RenameSuffixIn):
         raise ApiError(409, "the feed is not loaded: fix its errors first")
     if suffix == info.suffix:
         return {"suffix": suffix, "moved": None, "load": load_report(), "mtime": yaml_path.stat().st_mtime}
-    clash = next((i for i in registry.feeds.values()
-                  if i is not info and (i.suffix or "").lower() == suffix.lower()), None)
-    if clash is not None:
-        raise ApiError(409, f"suffix '{suffix}' is already used by {clash.dir}")
-    if any(i is not info and i.id == suffix for i in registry.feeds.values()):
-        raise ApiError(409, f"'{suffix}' is the id of another feed")
+    check_suffix_free(info, suffix)
     text = yaml_path.read_text(encoding="utf-8")
     updated = feeddef.set_suffix(text, suffix)
     problems = diagnostics_for(rel(yaml_path), updated)

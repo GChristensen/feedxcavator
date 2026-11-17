@@ -240,10 +240,14 @@ async function save(force = false) {
     file.clean = content
     file.dirty = false
     await afterLoad(result.load)
+    const renamed = result.renamed
+      ? `Suffix changed from '${result.renamed.from}' to '${result.renamed.to}'`
+        + (result.renamed.moved ? ', the stored state was moved.' : '.')
+      : ''
     // UI2-11: the result of the reload the save triggered
     if (result.load.ok) {
-      setOutput('')
-      flash('Successfully saved.')
+      setOutput(renamed)
+      flash(renamed ? 'Saved. ' + renamed : 'Successfully saved.')
     } else if (result.file_errors.length) {
       setOutput(formatLoad({ ok: false, errors: result.file_errors, abandoned: result.load.abandoned }))
       flash('Saved, but the file failed to load.', 0)
@@ -252,7 +256,7 @@ async function save(force = false) {
       flash('Saved. Other files have load errors.', 4000)
     }
   } catch (error) {
-    if (error instanceof ApiError && error.status === 409) {
+    if (error instanceof ApiError && error.status === 409 && error.body.mtime !== undefined) {
       // UI2-10: the file changed on disk while it was open
       busy.value = false
       if (confirm(`${file.path} was changed on disk since it was opened.\nOverwrite it with the editor contents?`)) {
@@ -346,42 +350,6 @@ async function subscribe(feed) {
 async function runFeedTasks(feed) {
   const result = await run(() => api.post('/feed/run-tasks', { key: feed.key }))
   if (result) flash(result.enqueued.length ? `Enqueued: ${result.enqueued.join(', ')}` : 'The feed has no tasks.', 4000)
-}
-
-// Changes the suffix in feed.yaml and moves the stored output, history and subscriptions with it.
-async function renameSuffix(node) {
-  const path = node.path + '/feed.yaml'
-  const open_ = files.find((f) => f.path === path)
-  if (open_ && open_.dirty) {
-    alert('Save or discard the unsaved changes in this feed.yaml first.')
-    return
-  }
-  const pinned = !!node.feed.id
-  const suffix = prompt(
-    `New suffix for "${node.feed.title || node.name}" (ASCII letters, digits, . - _ ~).\n`
-    + (pinned
-      ? 'The feed has an id, so its stored state stays where it is.'
-      : 'Its stored output, history and subscriptions move to the new name.')
-    + '\nThe feed URL changes: readers have to subscribe to the new one.',
-    node.feed.suffix || node.name,
-  )
-  if (!suffix || suffix === node.feed.suffix) return
-  const result = await run(() => api.post('/feed/rename-suffix', { path: node.path, suffix: suffix.trim() }))
-  if (!result) return
-  if (open_ && result.content !== undefined) {
-    open_.session.setValue(result.content)
-    open_.clean = result.content
-    open_.mtime = result.mtime
-    open_.dirty = false
-  }
-  await afterLoad(result.load)
-  const moved = result.moved
-  setOutput(`Suffix changed to ${result.suffix}.\n` + (moved
-    ? `Moved: ${moved.output ? 'stored output, ' : ''}${moved.history} history keys, `
-      + `${moved.subscriptions} subscriptions, ${moved.runs} run records.`
-    : 'The stored state is kept under the feed id and was not moved.')
-    + (result.load.ok ? '' : '\n\n' + formatLoad(result.load)))
-  flash('Suffix changed.')
 }
 
 // tree actions (UI2-6) -----------------------------------------------------------------------------
@@ -498,7 +466,6 @@ function showMenu(event, node) {
       { label: 'Run feed task', action: () => runFeedTasks(node.feed), disabled: !ok || !node.feed.tasks.length },
       { label: 'Suggest selectors', action: async () => { await open(node.path + '/feed.yaml'); await suggest() } },
       { divider: true },
-      { label: 'Rename suffix', action: () => renameSuffix(node), disabled: !node.feed.suffix },
       { label: 'Rename folder', action: () => rename(node) },
       { label: 'Delete', action: () => remove(node) },
     )
@@ -635,8 +602,6 @@ defineExpose({
             <span class="sep"></span>
             <button :disabled="!currentFeed || currentFeed.feed.status !== 'ok'" @click="openFeedUrl(currentFeed.feed)">Open</button>
             <button :disabled="!currentFeed || currentFeed.feed.status !== 'ok'" @click="subscribe(currentFeed.feed)">Subscribe</button>
-            <button :disabled="!currentFeed || !currentFeed.feed.suffix" title="Change the suffix and move the stored state with it"
-                    @click="renameSuffix(currentFeed)">Rename suffix</button>
             <button class="danger" :disabled="!currentFeed" @click="remove(currentFeed)">Delete</button>
           </template>
           <button v-if="isScratch" :disabled="busy" @click="runScratch">Run</button>

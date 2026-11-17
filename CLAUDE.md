@@ -101,8 +101,10 @@ directory, `handlers/`, then `tasks.yaml` and `schedules.yaml`.
   `feed.yaml`, and `/feed/uuid:<id>` works only for feeds that set an id.
 - **Suffixes** are ASCII (`feeddef.SUFFIX_RE`) and unique case-insensitively, because stores are files named by
   them. A directory name that is not a valid suffix needs an explicit `suffix`.
-- **Changing a suffix** by hand makes it a new feed. The console's "Rename suffix" (`/front/api/feed/rename-suffix`
-  → `storage.rename_feed_state`) moves the stored state. A new store keyed by the feed must be added there too.
+- **Changing a suffix** outside the console makes it a new feed. Saving a `feed.yaml` in the console whose effective
+  suffix changed (`PUT /front/api/file`, `api._suffix_change`; refused with 409 on a clash, skipped when the id
+  changes too) moves the stored state through `storage.rename_feed_state`, as does the API-only
+  `/front/api/feed/rename-suffix`. A new store keyed by the feed must be added there too.
 - An all-digit id is a YAML number, so `feeddef.parse_definition` re-reads it from the text. Keep that when
   touching id handling.
 - **lxml elements:** do not use `id(el.getparent())` or truth-test elements; proxies are transient.

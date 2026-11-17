@@ -562,6 +562,43 @@ def test_rename_suffix(http, ws, client):
     assert rename("feeds/pinned", "moved-url").json()["moved"] is None  # unchanged suffix: a no-op
 
 
+def test_save_renames_suffix(http, ws, client):
+    ws({
+        "feeds/plain/feed.yaml": "suffix: plain\nsource: https://e.test\nselectors: {item: p}\n",
+        "feeds/pinned/feed.yaml": f"id: {'d' * 32}\nsuffix: pinned\nsource: https://e.test\nselectors: {{item: p}}\n",
+        "feeds/other/feed.yaml": "suffix: Taken\nsource: https://e.test\nselectors: {item: p}\n",
+    }, startup=True)
+    storage.store_feed_output("plain", "<rss>stored</rss>", "application/rss+xml", 3)
+    path = "feeds/plain/feed.yaml"
+    original = (ws.root / path).read_text()
+
+    clash = put(client, path, "suffix: taken\nsource: https://e.test\nselectors: {item: p}\n")
+    assert clash.status_code == 409 and "mtime" not in clash.json()  # not a disk conflict
+    assert (ws.root / path).read_text() == original  # refused before writing
+
+    same = put(client, path, "suffix: plain\ntitle: T\nsource: https://e.test\nselectors: {item: p}\n").json()
+    assert same["renamed"] is None
+
+    done = put(client, path, "suffix: fresh\nsource: https://e.test\nselectors: {item: p}\n").json()
+    assert done["renamed"]["from"] == "plain" and done["renamed"]["to"] == "fresh"
+    assert done["renamed"]["moved"]["output"] is True and done["load"]["ok"]
+    assert storage.fetch_feed_output("fresh")["output"] == "<rss>stored</rss>"
+    assert storage.fetch_feed_output("plain") is None and client.get("/feed/plain").status_code == 404
+
+    # removing the suffix falls back to the directory name
+    back = put(client, path, "source: https://e.test\nselectors: {item: p}\n").json()
+    assert back["renamed"]["to"] == "plain" and storage.fetch_feed_output("plain")["output"] == "<rss>stored</rss>"
+
+    # a feed with an id keeps its state under the id
+    storage.store_feed_output("d" * 32, "pinned output", "text/plain", 1)
+    pinned = put(client, "feeds/pinned/feed.yaml",
+                 f"id: {'d' * 32}\nsuffix: moved\nsource: https://e.test\nselectors: {{item: p}}\n").json()
+    assert pinned["renamed"] == {"from": "pinned", "to": "moved", "moved": None}
+    assert storage.fetch_feed_output("d" * 32)["output"] == "pinned output"
+    assert put(client, "feeds/pinned/feed.yaml",
+               f"id: {'d' * 32}\nsuffix: taken\nsource: https://e.test\nselectors: {{item: p}}\n").status_code == 409
+
+
 def test_console_api_wordfilters(ws, client):
     ws({"feeds/news/feed.yaml": "source: http://example.com/\nselectors: {item: article}\n"
                                 "filter:\n  - wordfilter: spam\n"}, startup=True)
