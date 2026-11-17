@@ -539,18 +539,34 @@ CATEGORIES = [
 ]
 
 
+def _public_members(owner, cls):
+    """The public methods and properties of a class, in the order they are defined."""
+    return [(owner, cls, name) for name, member in vars(cls).items()
+            if not name.startswith("_") and (callable(member) or isinstance(member, property))]
+
+
 def _browser_methods():
     from feedxcavator.browser import Browser, Page
 
-    b = [("b", Browser, name) for name in ("open", "cookies", "user_agent")]
-    page = [("page", Page, name) for name in (
-        "html", "text", "selector", "apply_selectors", "url", "goto", "click", "fill", "press", "wait_for", "wait",
-        "scroll", "evaluate", "screenshot", "solve_captcha", "close")]
-    return b + page
+    return _public_members("b", Browser) + _public_members("page", Page)
 
+
+BROWSER_INTRO = """\
+`b` is the browser bound by the block, and `page` is what b.open(url) returns:
+
+    with browser() as b:
+        page = b.open(feed["source"], wait_for="article")
+        headlines = page.apply_selectors(feed)
+
+    (with-browser [b]
+      (setv page (.open b (:source feed) :wait-for "article"))
+      (.apply-selectors page feed))
+
+Each b.open opens another page; page.goto navigates the same page and returns it. Pages and the browser close
+at the end of the block, so take what you need from a page inside it."""
 
 # methods of the objects `browser` returns: shown on the API tab, not names in the user namespace
-METHODS = [("Browser", _browser_methods)]
+METHODS = [("Browser", BROWSER_INTRO, _browser_methods)]
 
 # Hy spellings that cannot be derived by mangling
 HY_ALIASES = {
@@ -663,7 +679,7 @@ def api_reference() -> list[dict]:
                 "doc": inspect.getdoc(fn) or "",
             })
         sections.append({"category": category, "entries": entries})
-    for category, methods in METHODS:
+    for category, intro, methods in METHODS:
         entries = []
         for owner, cls, attr in methods():
             member = inspect.getattr_static(cls, attr)
@@ -682,7 +698,7 @@ def api_reference() -> list[dict]:
                 "signature": "",
                 "doc": inspect.getdoc(fn) or "",
             })
-        sections.append({"category": category, "entries": entries})
+        sections.append({"category": category, "intro": intro, "entries": entries})
     sections.append({"category": "Hy macros", "entries": [
         {"name": form, "hy": form, "signature": "", "doc": doc} for form, doc in MACROS]})
     return sections

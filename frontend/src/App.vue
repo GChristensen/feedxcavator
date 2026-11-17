@@ -11,6 +11,7 @@ import WordFiltersTab from './components/WordFiltersTab.vue'
 import LogTab from './components/LogTab.vue'
 import SettingsTab from './components/SettingsTab.vue'
 import ApiTab from './components/ApiTab.vue'
+import ManualTab from './components/ManualTab.vue'
 import QuickOpen from './components/QuickOpen.vue'
 
 // UI2-2: Workspace, Schedules, Runs, Log, Settings, API, plus Tasks (TSK2-1) and Word filters (STO2-9)
@@ -23,6 +24,7 @@ const TABS = [
   { id: 'wordfilters', title: 'Word filters' },
   { id: 'log', title: 'Log' },
   { id: 'settings', title: 'Settings' },
+  { id: 'manual', title: 'Manual' },
   { id: 'api', title: 'API' },
 ]
 
@@ -64,7 +66,8 @@ function select(id) {
   }
   current.value = id
   visited.add(id)
-  if (window.location.hash.replace(/^#/, '') !== id) history.replaceState(null, '', '#' + id)
+  // the hash may carry a place inside the tab after a slash (#manual/selectors)
+  if (window.location.hash.replace(/^#/, '').split('/')[0] !== id) history.replaceState(null, '', '#' + id)
 }
 
 function onHash() {
@@ -164,6 +167,7 @@ onUnmounted(() => {
       <LogTab v-if="visited.has('log')" v-show="current === 'log'" :active="current === 'log'" />
       <SettingsTab v-if="visited.has('settings')" v-show="current === 'settings'" />
       <ApiTab v-if="visited.has('api')" v-show="current === 'api'" />
+      <ManualTab v-if="visited.has('manual')" v-show="current === 'manual'" />
     </div>
     <QuickOpen :open="quickOpen" @close="quickOpen = false" @pick="pickQuick" />
   </div>

@@ -215,9 +215,35 @@ pre.server-log { margin: 0; padding: 8px 12px; font: 12px var(--mono); white-spa
 .reference .entry { margin: 0 0 12px; }
 .reference .sig { font: 13px var(--mono); color: #a6e22e; }
 .reference .sig .hy { color: #66d9ef; margin-left: 10px; }
+.reference .intro { font: 13px var(--mono); white-space: pre-wrap; margin: 0 0 14px; color: var(--text); }
 .reference .doc { margin: 2px 0 0 14px; white-space: pre-wrap; color: var(--text); }
 .reference .search { position: sticky; top: -12px; background: var(--panel); padding: 8px 0; z-index: 1; }
 .reference .search input { width: 320px; }
+
+/* Manual tab: contents on the left, the rendered manual.md on the right */
+.manual { flex-direction: row; }
+.manual-toc { flex: none; width: 250px; overflow: auto; padding: 12px 8px; border-right: 1px solid var(--border);
+  background: var(--panel); }
+.manual-toc a { display: block; padding: 3px 8px; border-radius: 3px; color: var(--text); text-decoration: none;
+  font-size: 13px; line-height: 1.35; }
+.manual-toc a.sub { padding-left: 22px; color: var(--muted); font-size: 12px; }
+.manual-toc a:hover { background: var(--panel-2); color: #fff; }
+.manual-toc a.selected { background: var(--panel-2); color: #fff; box-shadow: inset 2px 0 0 var(--accent); }
+.manual-body { flex: 1; min-width: 0; overflow: auto; padding: 4px 28px 40px; }
+.manual-text { max-width: 900px; line-height: 1.55; }
+.manual-text h1 { font-size: 22px; font-weight: 500; color: #fff; margin: 16px 0 12px; }
+.manual-text h2 { font-size: 18px; font-weight: 500; color: #fff; border-bottom: 1px solid var(--border);
+  padding-bottom: 4px; margin: 32px 0 10px; }
+.manual-text h3 { font-size: 15px; font-weight: 500; color: #fff; margin: 22px 0 8px; }
+.manual-text code { font: 12.5px var(--mono); background: var(--panel-2); padding: 1px 4px; border-radius: 3px; }
+.manual-text pre { background: var(--panel); border: 1px solid var(--border); border-radius: 4px; padding: 10px 12px;
+  overflow: auto; }
+.manual-text pre code { background: none; padding: 0; color: #e6db74; }
+.manual-text table { border-collapse: collapse; margin: 10px 0; font-size: 13px; }
+.manual-text th, .manual-text td { border: 1px solid var(--border); padding: 5px 8px; text-align: left;
+  vertical-align: top; }
+.manual-text th { background: var(--panel); font-weight: 500; }
+.manual-text li { margin: 3px 0; }
 
 .cron-words { color: var(--muted); font-size: 12px; }
 .next-fires { font: 12px var(--mono); color: var(--muted); line-height: 1.5; }

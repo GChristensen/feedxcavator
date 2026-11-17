@@ -371,6 +371,12 @@ def test_console_api_tasks_schedules_and_misc(ws, client):
     fetching = next(s for s in reference if s["category"] == "Fetching")
     entry = next(e for e in fetching["entries"] if e["name"] == "fetch_url")
     assert entry["hy"] == "fetch-url" and "Never raises" in entry["doc"]  # UC2-21
+    browser_entries = next(s for s in reference if s["category"] == "Browser")["entries"]
+    assert any(e["name"].startswith("page.wait_for(") for e in browser_entries)
+    assert [e["name"] for e in browser_entries if not e["doc"]] == []  # every public browser method is documented
+    manual = client.get(f"{API}/manual").json()
+    assert '<h2 id="selectors">Selectors</h2>' in manual["html"] and "<table>" in manual["html"]
+    assert any(t["id"] == "selectors" for t in manual["toc"][0]["children"])
 
     from feedxcavator import applog
 

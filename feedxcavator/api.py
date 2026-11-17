@@ -511,6 +511,20 @@ def reference(request):
     return {"sections": userlib.api_reference(), "version": VERSION}
 
 
+MANUAL = Path(__file__).with_name("manual.md")
+
+
+@api.get("/manual")
+@blocking
+def manual(request):
+    """The Manual tab: feedxcavator/manual.md rendered to HTML, with its table of contents."""
+    import markdown
+
+    md = markdown.Markdown(extensions=["fenced_code", "tables", "toc"])
+    html = md.convert(MANUAL.read_text(encoding="utf-8"))
+    return {"html": html, "toc": md.toc_tokens}
+
+
 @api.get("/schemas")
 @blocking
 def schemas(request):

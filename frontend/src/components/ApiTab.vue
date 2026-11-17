@@ -40,6 +40,7 @@ onMounted(async () => {
     </p>
     <div v-for="section in visible" :key="section.category">
       <h2>{{ section.category }}</h2>
+      <pre v-if="section.intro" class="intro">{{ section.intro }}</pre>
       <div v-for="entry in section.entries" :key="entry.name" class="entry">
         <div class="sig">
           {{ entry.name }}{{ entry.signature }}

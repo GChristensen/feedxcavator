@@ -114,6 +114,9 @@ directory, `handlers/`, then `tasks.yaml` and `schedules.yaml`.
   at startup.
 - **Frontend changes** need `npm run build`; the built assets under `feedxcavator/static/console` are committed.
   `mode-hy.js` lists the prelude names for highlighting and should follow `userlib.py` and `hylib.hy`.
+- **User documentation** is `feedxcavator/manual.md` (shown on the console's Manual tab through `GET
+  /front/api/manual`); `README.md` keeps only the overview and installation. Document a user-visible change in the
+  manual.
 - **Shell:** in Git Bash on this machine, long heredocs that write several files and contain apostrophes fail to
   parse. Write files with the editor tools instead.
 
