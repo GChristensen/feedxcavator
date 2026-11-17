@@ -121,27 +121,6 @@ The built console is committed under `feedxcavator/static/console`, so no build 
 `just lock` updates `uv.lock` and exports `constraints.txt` from it, which the pip path of `install.py` uses; a
 test fails when the two disagree.
 
-### Demo
-
-`demo/` is a static build of the console for GitHub Pages (`demo/console.html`). A mock backend
-(`frontend/src/demo/mock.js`) answers the API from `frontend/src/demo/fixtures.json`, and edits stay in the browser
-tab. It needs no server: Pages serves it, and `demo/console.html` also opens straight from disk, because the demo
-build is one classic script rather than ES modules, which browsers refuse to load from `file://`.
-
-The fixtures are recorded from a real server running the sample workspace `demo/workspace/` from the home
-`demo/home/` (kept out of git: it holds the database and the browser profiles). The X and YouTube feeds read
-fictional pages in `demo/sites/`, drawn by scripts like the real sites, which the recorder serves on port 21901, so
-recording needs no network for them:
-
-```
-just demo-server       # writes demo/home/config.yml on first use, starts the server in a new window
-just record-demo       # records the fixtures, then builds; --feeds x-orbital-lab --no-run records only that feed
-just build-demo        # only rebuilds demo/ from the fixtures (npm run dev:demo serves it with hot reload)
-```
-
-Without just: start the server with `FEEDXCAVATOR_HOME=demo/home`, then run `python tools/record_demo.py` and
-`npm run build:demo` in `frontend/`.
-
 ### Components
 
 | Area | Built on |

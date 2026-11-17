@@ -14,3 +14,4 @@ node_modules/
 .pytest_cache/
 *.tmp
 /demo/home/
+/CLAUDE.md

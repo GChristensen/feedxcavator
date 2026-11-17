@@ -68,7 +68,6 @@ deploy:
     if (-not (Test-Path -LiteralPath '{{remote}}')) { throw 'Server directory not reachable: {{remote}}' }
     robocopy feedxcavator '{{remote}}\feedxcavator' /MIR /XD __pycache__ {{rc}}{{ok}}
     robocopy deploy '{{remote}}\deploy' /MIR {{rc}}{{ok}}
-    robocopy docs '{{remote}}\docs' /MIR {{rc}}{{ok}}
     robocopy . '{{remote}}' pyproject.toml uv.lock constraints.txt install.py README.md config.example.yml *.sh feedxcavator.cmd {{rc}}{{ok}}
     @echo 'Deployed. If dependencies changed, run python3 install.py there first. Then restart the server.'
 
