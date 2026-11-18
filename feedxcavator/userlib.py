@@ -55,10 +55,12 @@ def task_function(name):
     return _decorator("task_function", name)
 
 
-def proxy(name, host=None, port=None, user=None, password=None, scheme="http"):
-    """proxy("name", host=, port=, user=, password=, scheme="http"): defines a proxy that feeds
-    (`fetch.proxy`) and fetch_url (`proxy=`) refer to by name."""
-    definition = {"host": host, "port": port, "user": user, "password": password, "scheme": scheme}
+def proxy(name, host=None, port=None, user=None, password=None, scheme="http", secret=None):
+    """proxy("name", host=, port=, user=, password=, scheme="http", secret=None): defines a proxy that feeds
+    (`fetch.proxy`) and fetch_url (`proxy=`) refer to by name. `scheme="mtproto"` with a `secret` defines a
+    Telegram (MTProto) proxy, which only the Telegram calls can use."""
+    definition = {"host": host, "port": port, "user": user, "password": password, "scheme": scheme,
+                  "secret": secret}
     workspace.register("proxy", str(name), definition)
     return definition
 
@@ -426,8 +428,8 @@ class _Telegram:
     @staticmethod
     def get_channel_messages(channel, limit=26, proxy=None):
         """Headlines for the most recent messages of a public Telegram channel (up to 26). The call goes
-        through the proxy named by `proxy` (False for a direct connection), otherwise the feed's
-        `fetch.proxy`, otherwise the proxy named `default` when `telegram.default-proxy` is on."""
+        through the proxy named by `telegram.use-proxy` when it is set, otherwise the one named by `proxy`
+        (False for a direct connection), otherwise the feed's `fetch.proxy`, otherwise directly."""
         from feedxcavator import telegram as tg
 
         return tg.get_channel_messages(channel, limit, proxy)

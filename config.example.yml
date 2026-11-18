@@ -48,9 +48,11 @@ browser-pool-size: 1
 #captcha-flash: false            # solve-captcha: show a marker where the pointer acts, to check coordinates
 
 # Proxies, referred to by name from fetch.proxy in feed.yaml and the proxy option of fetch_url.
-# Telegram uses the one named default. Schemes: http, https, socks5, socks5h, socks4.
+# Schemes: http, https, socks5, socks5h, socks4, and mtproto (a Telegram proxy, used only by Telegram calls;
+# a tg://proxy?server=...&port=...&secret=... link can be pasted as is).
 #proxies:
 #  default: socks5://127.0.0.1:1080
+#  tg: tg://proxy?server=proxy.example.com&port=443&secret=dd0123456789abcdef0123456789abcdef
 #  work:
 #    scheme: http
 #    host: proxy.example.com
@@ -65,8 +67,8 @@ browser-pool-size: 1
 #telegram:
 #  api-id: 123456                # 3.0.0 spelling: tg-api-id
 #  api-hash: 0123456789abcdef0123456789abcdef   # 3.0.0 spelling: tg-api-hash
-#  default-proxy: false          # a call uses the fetch.proxy of the calling feed; when the feed names none,
-#                                # true routes it through the proxy named default, false connects directly
+#  use-proxy: tg                 # a proxy name: every Telegram connection (the login too) goes through it;
+#                                # unset, a call uses the fetch.proxy of the calling feed, or connects directly
 
 # A local Python/Hy REPL attached to the worker's namespace, bound to 127.0.0.1
 #repl-port: 7888                 # or FEEDXCAVATOR_REPL_PORT

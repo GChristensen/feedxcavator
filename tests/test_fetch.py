@@ -142,29 +142,62 @@ def test_proxies_from_config(transport, monkeypatch):
     calls = len(transport.calls)
     assert fetch.fetch_url("http://t.test/", proxy="broken") is None  # no port: not usable, fails closed
     assert isinstance(fetch.get_last_network_error(), LookupError) and len(transport.calls) == calls
-    tg = telegram._proxy("default")
+    tg = telegram._proxy("default")["proxy"]
     assert tg["proxy_type"] == "socks5" and tg["addr"] == "127.0.0.1" and tg["port"] == 1080
     assert tg["username"] == "me" and tg["password"] == "p@ss"
-    assert telegram._proxy(None) is None
+    assert telegram._proxy(None) == {}
     with pytest.raises(LookupError):
         telegram._proxy("missing")  # fails closed, as fetch_url does
+
+
+def test_mtproto_proxies(transport, monkeypatch):
+    from telethon import connection
+
+    from feedxcavator import browser, conf, telegram
+
+    key = "0123456789abcdef0123456789abcdef"
+    monkeypatch.setitem(conf.config, "proxies", {
+        "plain": {"scheme": "mtproto", "host": "m.test", "port": 443, "secret": key},
+        "url": f"mtproto://u.test:8443?secret=dd{key}",
+        "link": f"tg://proxy?server=l.test&port=443&secret=dd{key}",
+        "web": f"https://t.me/proxy?server=w.test&port=443&secret={key}",
+        "faketls": f"tg://proxy?server=f.test&port=443&secret=ee{key}6578616d706c652e636f6d",
+        "nosecret": {"scheme": "mtproto", "host": "n.test", "port": 443},
+    })
+    plain = telegram._proxy("plain")
+    assert plain == {"proxy": ("m.test", 443, key), "connection": connection.ConnectionTcpMTProxyIntermediate}
+    for name, host, port in [("url", "u.test", 8443), ("link", "l.test", 443)]:
+        options = telegram._proxy(name)  # dd-secrets need the randomized intermediate protocol
+        assert options == {"proxy": (host, port, key),
+                           "connection": connection.ConnectionTcpMTProxyRandomizedIntermediate}
+    assert telegram._proxy("web")["proxy"] == ("w.test", 443, key)
+    with pytest.raises(ValueError, match="fake-TLS"):
+        telegram._proxy("faketls")
+    with pytest.raises(LookupError):
+        telegram._proxy("nosecret")  # not usable without a secret: fails closed
+    # an MTProto proxy cannot carry HTTP: fetches and browsers refuse it instead of connecting directly
+    assert fetch.fetch_url("http://t.test/", proxy="plain") is None and not transport.calls
+    assert "MTProto" in str(fetch.get_last_network_error())
+    with pytest.raises(browser.BrowserError, match="MTProto"):
+        with browser.browser(proxy="link"):
+            pass
 
 
 def test_telegram_proxy_choice(monkeypatch):
     from feedxcavator import conf, context, telegram
 
     monkeypatch.setitem(conf.config, "telegram", None)
-    assert telegram.proxy_name() is None  # TG2-1: default-proxy is off by default
-    monkeypatch.setitem(conf.config, "telegram", {"default-proxy": True})
-    assert telegram.proxy_name() == "default"
+    assert telegram.proxy_name() is None  # TG2-1: a direct connection unless something names a proxy
     with context.scope(feed={"fetch": {"proxy": "work"}}):
-        assert telegram.proxy_name() == "work"  # the feed's proxy wins over default
+        assert telegram.proxy_name() == "work"
         assert telegram.proxy_name("other") == "other" and telegram.proxy_name(False) is False
     with context.scope(feed={"fetch": {}}):
-        assert telegram.proxy_name() == "default"
-    monkeypatch.setitem(conf.config, "telegram", {"default-proxy": False})
-    with context.scope(feed={"fetch": {}}):
         assert telegram.proxy_name() is None
+    monkeypatch.setitem(conf.config, "telegram", {"use-proxy": "tg"})
+    assert telegram.proxy_name() == "tg"  # use-proxy is used for every call
+    with context.scope(feed={"fetch": {"proxy": "work"}}):
+        assert telegram.proxy_name() == "tg"
+        assert telegram.proxy_name("other") == "tg" and telegram.proxy_name(False) == "tg"
 
 
 def test_telegram_settings(monkeypatch):

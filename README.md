@@ -83,7 +83,7 @@ Commands (`python -m feedxcavator <command>`):
 | `run` (default), `--dev` | supervisor: web + worker; `--dev` reloads the web process on code changes |
 | `web`, `worker` | one process only |
 | `set-password [--user U] [--password P]` | create the user or set its password |
-| `telegram-login` | interactive Telegram login, creates `data/telegram/` |
+| `telegram-login [--qr]` | interactive Telegram login (phone and code, or `--qr` to scan a QR code), creates `data/telegram/` |
 | `manage <django command>` | any Django management command |
 
 ### HTTPS

@@ -573,6 +573,8 @@ class browser:
             proxy = fetch.resolve_proxy(self._proxy_name)
             if proxy is None:
                 raise BrowserError(f"browser: proxy '{self._proxy_name}' is not defined")
+            if fetch.is_mtproto(proxy):
+                raise BrowserError(f"browser: proxy '{self._proxy_name}' is an MTProto proxy, usable only by Telegram")
         if _pool is not None:
             self._transport = _LocalTransport(_pool, self._profile, proxy)
         else:

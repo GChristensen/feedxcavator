@@ -97,7 +97,7 @@ SERVICE_TASK_DEFAULTS = {
 TELEGRAM_DEFAULTS = {
     "api-id": None,
     "api-hash": None,
-    "default-proxy": False,  # use the proxy named `default` when the calling feed names no fetch.proxy
+    "use-proxy": None,  # a proxy name: every Telegram connection goes through it; unset, the calling feed decides
 }
 
 

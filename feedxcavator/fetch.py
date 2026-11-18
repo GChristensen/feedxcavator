@@ -9,7 +9,7 @@ import re
 import threading
 import time
 from email.utils import parsedate_to_datetime
-from urllib.parse import quote, unquote, urlsplit
+from urllib.parse import parse_qs, quote, unquote, urlsplit
 
 from feedxcavator import applog, conf, context
 
@@ -22,7 +22,10 @@ RETRYABLE_STATUSES = {408, 425, 429, 500, 502, 503, 504}
 DEFAULT_TIMEOUT = 30.0
 DEFAULT_IMPERSONATE = "chrome"
 
-# name -> {host, port, user, password, scheme}; replaced by the workspace loader on every load (FT-7)
+# an MTProto proxy (a Telegram proxy, `secret` instead of user and password) serves only Telegram calls
+MTPROTO = "mtproto"
+
+# name -> {host, port, user, password, scheme, secret}; replaced by the workspace loader on every load (FT-7)
 proxy_resolver = lambda name: None  # noqa: E731
 
 # host -> {cookies, user_agent, impersonate}: sessions handed over by the browser (BRW-5)
@@ -95,29 +98,54 @@ def decode_body(body: bytes, content_type: str | None = None, charset: str | Non
     return body.decode("utf-8", "replace")
 
 
+def is_mtproto(definition: dict | None) -> bool:
+    return bool(definition) and str(definition.get("scheme") or "").lower() == MTPROTO
+
+
+def _proxy_link(value: str) -> dict | None:
+    """A Telegram proxy link, `tg://proxy?server=...&port=...&secret=...` or its https://t.me/proxy form, as an
+    MTProto proxy definition; None for any other URL."""
+    parts = urlsplit(value)
+    link = ((parts.scheme == "tg" and parts.netloc == "proxy")
+            or (parts.scheme in ("http", "https") and parts.hostname in ("t.me", "telegram.me")
+                and parts.path.rstrip("/") == "/proxy"))
+    if not link:
+        return None
+    query = {k: v[0] for k, v in parse_qs(parts.query).items()}
+    port = query.get("port", "")
+    return {"host": query.get("server"), "port": int(port) if port.isdigit() else None, "scheme": MTPROTO,
+            "user": None, "password": None, "secret": query.get("secret")}
+
+
 def _config_proxy(name: str) -> dict | None:
-    """A proxy from the `proxies` key of config.yml: a mapping (host, port, user, password, scheme) or a URL
-    such as `socks5://user:password@host:1080`."""
+    """A proxy from the `proxies` key of config.yml: a mapping (host, port, user, password, scheme, secret), a URL
+    such as `socks5://user:password@host:1080` or `mtproto://host:443?secret=...`, or a Telegram proxy link."""
     proxies = conf.get("proxies") or {}
     value = proxies.get(name) if isinstance(proxies, dict) else None
     if value is None:
         return None
     if isinstance(value, str):
-        parts = urlsplit(value if "://" in value else f"http://{value}")
-        try:
-            port = parts.port
-        except ValueError:
-            port = None
-        definition = {"host": parts.hostname, "port": port, "scheme": parts.scheme or "http",
-                      "user": unquote(parts.username) if parts.username else None,
-                      "password": unquote(parts.password) if parts.password else None}
+        definition = _proxy_link(value)
+        if definition is None:
+            parts = urlsplit(value if "://" in value else f"http://{value}")
+            try:
+                port = parts.port
+            except ValueError:
+                port = None
+            definition = {"host": parts.hostname, "port": port, "scheme": parts.scheme or "http",
+                          "user": unquote(parts.username) if parts.username else None,
+                          "password": unquote(parts.password) if parts.password else None,
+                          "secret": (parse_qs(parts.query).get("secret") or [None])[0]}
     elif isinstance(value, dict):
         definition = {"host": value.get("host"), "port": value.get("port"), "scheme": value.get("scheme") or "http",
-                      "user": value.get("user"), "password": value.get("password")}
+                      "user": value.get("user"), "password": value.get("password"), "secret": value.get("secret")}
     else:
         definition = {}
     if not definition.get("host") or not definition.get("port"):
         logger.warning("proxy '%s' in config.yml needs a host and a port", name)
+        return None
+    if is_mtproto(definition) and not definition.get("secret"):
+        logger.warning("MTProto proxy '%s' in config.yml needs a secret", name)
         return None
     return definition
 
@@ -288,6 +316,11 @@ def fetch_url(url, **options):
             if not definition:  # fail closed: a misspelt name must not mean a direct connection
                 name = str(getattr(proxy_name, "name", proxy_name))
                 state.network_error = LookupError(f"proxy '{name}' is not defined")
+                applog.write("error", f"Fetch error\nURL: {url}\nError: {state.network_error}")
+                return None
+            if is_mtproto(definition):  # it cannot carry HTTP; connecting directly instead would leak the address
+                name = str(getattr(proxy_name, "name", proxy_name))
+                state.network_error = LookupError(f"proxy '{name}' is an MTProto proxy, usable only by Telegram")
                 applog.write("error", f"Fetch error\nURL: {url}\nError: {state.network_error}")
                 return None
             proxy = proxy_url(definition)

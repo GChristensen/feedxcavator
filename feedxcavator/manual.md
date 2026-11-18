@@ -599,7 +599,7 @@ Proxies are defined by name under `proxies` in `config.yml`, either as a URL or 
 proxies:
   default: socks5://127.0.0.1:1080
   work:
-    scheme: http          # http (the default), https, socks5, socks5h or socks4
+    scheme: http          # http (the default), https, socks5, socks5h, socks4 or mtproto (see below)
     host: proxy.example.com
     port: 3128
     user: me              # optional
@@ -614,10 +614,34 @@ feed. `proxy=False` forces a direct connection. A name that is not defined (or a
 port) fails the fetch with a network error, written to the log, rather than connecting directly; the browser
 and Telegram calls refuse it too.
 
-The name `default` is not applied to feeds by itself; a feed must name it in `fetch.proxy`. Telegram calls use
-the `fetch.proxy` of the calling feed too (or their own `proxy` argument); when the feed names none, they go
-through the proxy named `default` only if `telegram.default-proxy` is true. The `/forward` links made by
+The name `default` is not applied to feeds by itself; a feed must name it in `fetch.proxy`. Telegram calls go
+through the proxy named by `telegram.use-proxy` when it is set, whatever the feed or the call says. Otherwise they
+use their own `proxy` argument, then the `fetch.proxy` of the calling feed, and connect directly when neither names
+one. The `/forward` links made by
 `forward_url(url, referer, proxy="name")` fetch through the named proxy. WebSub callbacks never use a proxy.
+
+### MTProto proxies
+
+A Telegram proxy (MTProto) is defined with the scheme `mtproto` and its `secret`, in any of these forms; a link
+as Telegram shares it can be pasted as is:
+
+```yaml
+proxies:
+  tg: tg://proxy?server=proxy.example.com&port=443&secret=dd0123456789abcdef0123456789abcdef
+  tg2: mtproto://proxy.example.com:443?secret=0123456789abcdef0123456789abcdef
+  tg3:
+    scheme: mtproto
+    host: proxy.example.com
+    port: 443
+    secret: dd0123456789abcdef0123456789abcdef
+```
+
+Only Telegram calls can use it: a fetch or a browser that names it fails, rather than connecting directly. Plain
+secrets (32 hex characters) and `dd` secrets work. Fake-TLS secrets (starting with `ee`, the only kind mtg 2
+issues) do not, because Telethon cannot speak that protocol; the call fails with an error in the log. When you
+deploy a proxy for Feedxcavator, use one that accepts a plain or `dd` secret, such as the official
+`telegrammessenger/proxy` image. In code, `(defproxy tg :scheme "mtproto" :host "..." :port 443 :secret "...")`
+defines one.
 
 ## Images and media
 
@@ -833,6 +857,38 @@ the file to get a new identity, or after changing the machine's graphics.
 `telegram.get_channel_messages(channel)` returns headlines for the latest messages of a public Telegram channel,
 and `telegram.notify(message, chat_id)` sends a text message. Both need `api-id` and `api-hash` under the
 `telegram` key of `config.yml` and a one-time login with `python -m feedxcavator telegram-login`.
+
+```yaml
+telegram:
+  api-id: 123456
+  api-hash: 0123456789abcdef0123456789abcdef
+  use-proxy: tg       # optional: every Telegram connection, the login included, goes through this proxy
+```
+
+Without `use-proxy`, a call goes through the proxy its feed names in `fetch.proxy`, or directly (see Proxies). An
+MTProto proxy (see MTProto proxies) can be used only for Telegram.
+
+### Logging in
+
+Log in with your own account: a bot cannot read channel history. The API id and hash come from an app created at
+https://my.telegram.org (API development tools). Run the login on the server, in the installation directory:
+
+```
+python -m feedxcavator telegram-login --qr
+```
+
+With `--qr` it shows a QR code in the terminal. In Telegram on your phone, open Settings > Devices > Link Desktop
+Device and scan it. A code is valid for about 30 seconds and a new one follows until you scan it or press Ctrl+C.
+
+Without `--qr` it asks for the phone number and says where Telegram sent the code: to the Telegram app (a chat
+from Telegram), by SMS or call, or by email when the account has a login email. Enter nothing at the code prompt to
+have it sent another way, when Telegram offers one. Telegram expires a code that was sent in any Telegram chat, so
+type it rather than forwarding or pasting it there.
+
+Either way, an account with two-step verification is then asked for its cloud password. The session is stored in
+`data/telegram/feedxcavator.session`; keep it private, as it gives access to the account. To log in as someone
+else, stop the server, delete that file and run the login again. A session made on another machine with the same
+API id and hash can be copied there too.
 
 ## Handlers
 

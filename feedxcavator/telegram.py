@@ -35,35 +35,71 @@ def _inactive_reason() -> str | None:
 
 
 def proxy_name(proxy=None):
-    """TG2-1: the proxy a call uses, resolved in the calling process. An explicit name wins and False means a
-    direct connection; otherwise the `fetch.proxy` of the current feed, and failing that the proxy named
-    `default` when `telegram.default-proxy` is on."""
+    """TG2-1: the proxy a call uses, resolved in the calling process. `telegram.use-proxy`, when set, is used
+    for every call. Otherwise an explicit name, with False for a direct connection; otherwise the `fetch.proxy`
+    of the current feed; otherwise a direct connection."""
+    forced = conf.telegram("use-proxy")
+    if forced:
+        return str(forced)
     if proxy is False:
         return False
     if proxy:
         return str(getattr(proxy, "name", proxy))
     feed = context.current_feed.get()
     feed_proxy = ((feed.get("fetch") if feed is not None else None) or {}).get("proxy")
-    if feed_proxy:
-        return str(feed_proxy)
-    return "default" if conf.telegram("default-proxy") else None
+    return str(feed_proxy) if feed_proxy else None
 
 
-def _proxy(name=None):
-    """The Telethon proxy settings for a proxy name, None for a direct connection."""
+def _mtproto_secret(secret) -> tuple[str, bool]:
+    """The 16-byte key of an MTProto proxy secret (hex or base64) as hex, and whether it is a dd-secret (which
+    needs the randomized intermediate protocol). Fake-TLS ee-secrets are refused: Telethon cannot speak it."""
+    import base64
+    import binascii
+
+    text = str(secret or "").strip()
+    try:
+        raw = bytes.fromhex(text)
+    except ValueError:
+        try:
+            raw = base64.urlsafe_b64decode(text.replace("+", "-").replace("/", "_") + "=" * (-len(text) % 4))
+        except (binascii.Error, ValueError):
+            raw = b""
+    if len(raw) > 17 and raw[0] == 0xEE:
+        raise ValueError("fake-TLS MTProto secrets (starting with ee) are not supported; "
+                         "use a plain or dd secret of the proxy")
+    if len(raw) == 17 and raw[0] == 0xDD:
+        return raw[1:].hex(), True
+    if len(raw) == 16:
+        return raw.hex(), False
+    raise ValueError("an MTProto proxy secret is 32 hex characters, or dd and 32 hex characters")
+
+
+def _proxy(name=None) -> dict:
+    """The TelegramClient options for a proxy name: `proxy` (and `connection` for an MTProto proxy), or no
+    options for a direct connection."""
     from feedxcavator import fetch
 
     if not name:
-        return None
+        return {}
     proxy = fetch.resolve_proxy(name)
     if not proxy:  # fail closed, as fetch_url does: a misspelt name must not mean a direct connection
         raise LookupError(f"proxy '{name}' is not defined")
+    if fetch.is_mtproto(proxy):
+        from telethon import connection
+
+        try:
+            key, dd = _mtproto_secret(proxy.get("secret"))
+        except ValueError as e:
+            raise ValueError(f"proxy '{name}': {e}") from None
+        return {"proxy": (str(proxy["host"]), int(proxy["port"]), key),
+                "connection": (connection.ConnectionTcpMTProxyRandomizedIntermediate if dd
+                               else connection.ConnectionTcpMTProxyIntermediate)}
     schemes = {"socks5": "socks5", "socks5h": "socks5", "socks4": "socks4", "socks4a": "socks4"}
-    return {
+    return {"proxy": {
         "proxy_type": schemes.get(str(proxy.get("scheme")).lower(), "http"),
         "addr": proxy["host"], "port": int(proxy["port"]), "rdns": True,
         "username": proxy.get("user") or None, "password": proxy.get("password") or None,
-    }
+    }}
 
 
 def make_client(proxy=None):
@@ -71,7 +107,9 @@ def make_client(proxy=None):
 
     session_path().parent.mkdir(parents=True, exist_ok=True)
     return TelegramClient(str(session_path()), int(conf.telegram("api-id")), str(conf.telegram("api-hash")),
-                          proxy=_proxy(proxy), device_model="PC", app_version="4", system_lang_code="en")
+                          **_proxy(proxy), device_model="PC", app_version="4",
+                          # Telegram sends no login code to a client whose system_lang_code is a bare "en"
+                          system_lang_code="en-US")
 
 
 # rendering ------------------------------------------------------------------------------------
@@ -239,13 +277,134 @@ def notify(message, chat_id, proxy=None):
     return _forward("telegram_notify", message, chat_id, proxy=proxy)
 
 
-def login():
-    """TG-6: the interactive login (phone number and code) that creates the session."""
+# login ----------------------------------------------------------------------------------------
+
+_CODE_DELIVERY = {
+    "SentCodeTypeApp": "to your Telegram app, in a chat from Telegram",
+    "SentCodeTypeSms": "by SMS",
+    "SentCodeTypeFirebaseSms": "by SMS",
+    "SentCodeTypeFragmentSms": "by SMS through Fragment",
+    "SentCodeTypeCall": "by a phone call",
+    "SentCodeTypeFlashCall": "as a flash call: the code is the end of the calling number",
+    "SentCodeTypeMissedCall": "as a missed call: the code is the end of the calling number",
+    "SentCodeTypeEmailCode": "by email",
+}
+
+
+def _user_name(user) -> str:
+    name = getattr(user, "username", None)
+    return f"@{name}" if name else " ".join(filter(None, [getattr(user, "first_name", None),
+                                                          getattr(user, "last_name", None)])) or str(user.id)
+
+
+def login(qr: bool = False):
+    """TG-6: the interactive login that creates the session: by QR code scanned in the Telegram app, or by
+    phone number and the code Telegram sends (to the app, by SMS or call, or by email)."""
     if not configured():
         raise SystemExit("Set telegram.api-id and telegram.api-hash in config.yml first.")
+    try:
+        asyncio.run(_login(qr))
+    except KeyboardInterrupt:
+        raise SystemExit("\nLogin cancelled.") from None
+
+
+async def _login(qr: bool):
+    from telethon import errors
+
     client = make_client(proxy_name())
-    client.start()
-    me = client.loop.run_until_complete(client.get_me())
-    print(f"Logged in as {getattr(me, 'username', None) or getattr(me, 'first_name', '')}. "
-          f"Session stored in {session_path()}.session")
-    client.disconnect()
+    await client.connect()
+    try:
+        if await client.is_user_authorized():
+            me = await client.get_me()
+            raise SystemExit(
+                f"Already logged in as {_user_name(me)}{' (a bot)' if getattr(me, 'bot', False) else ''}. "
+                f"To log in again, stop the server, delete {session_path()}.session and run telegram-login.")
+        try:
+            user = await (_qr_login(client) if qr else _code_login(client))
+        except errors.SessionPasswordNeededError:
+            user = await _password_login(client)
+        print(f"Logged in as {_user_name(user)}. Session stored in {session_path()}.session")
+    except errors.RPCError as e:
+        raise SystemExit(f"Telegram refused the login: {type(e).__name__}: {e}") from None
+    finally:
+        await client.disconnect()
+
+
+def _print_qr(code):
+    """Half-block characters where the terminal can show them, else segno's colored spaces (twice as tall)."""
+    import sys
+
+    try:
+        "▀▄█".encode(sys.stdout.encoding or "ascii")
+        compact = True
+    except (UnicodeEncodeError, LookupError):
+        compact = False
+    code.terminal(compact=compact)
+
+
+async def _qr_login(client):
+    import segno
+
+    qr = await client.qr_login()
+    while True:
+        print("\nIn Telegram on your phone, open Settings > Devices > Link Desktop Device and scan this code:\n")
+        _print_qr(segno.make(qr.url, error="l"))
+        print(f"\nThe code is valid until {qr.expires.astimezone():%H:%M:%S}; a new one follows. Ctrl+C cancels.")
+        try:
+            return await qr.wait()
+        except asyncio.TimeoutError:
+            await qr.recreate()
+
+
+async def _code_login(client):
+    from telethon import errors, functions, types
+
+    phone = input("Phone number, in international format (+71234567890): ").strip()
+    sent = await client.send_code_request(phone)
+    while True:
+        if isinstance(sent.type, types.auth.SentCodeTypeSetUpEmailRequired):
+            raise SystemExit("Telegram asks this account to set up a login email first, which only its own apps "
+                             "can do. Log in with --qr instead.")
+        by_email = isinstance(sent.type, types.auth.SentCodeTypeEmailCode)
+        where = _CODE_DELIVERY.get(type(sent.type).__name__, f"({type(sent.type).__name__})")
+        if by_email:
+            where += f" to {sent.type.email_pattern}"
+        print(f"Telegram sent the code {where}.")
+        if sent.next_type is not None:
+            print("Enter nothing to have it sent another way.")
+        code = input("Code: ").strip().replace(" ", "")
+        if not code:
+            if sent.next_type is None:
+                continue
+            sent = await client(functions.auth.ResendCodeRequest(phone, sent.phone_code_hash))
+            continue
+        try:
+            if by_email:  # Telethon's sign_in sends every code as a phone code, which Telegram rejects here
+                result = await client(functions.auth.SignInRequest(
+                    phone, sent.phone_code_hash, email_verification=types.EmailVerificationCode(code)))
+                if isinstance(result, types.auth.AuthorizationSignUpRequired):
+                    raise SystemExit("There is no Telegram account for this phone number.")
+                return await client._on_login(result.user)
+            return await client.sign_in(phone, code, phone_code_hash=sent.phone_code_hash)
+        except errors.PhoneCodeInvalidError:
+            print("Wrong code, try again.")
+        except errors.BadRequestError as e:
+            if e.message not in ("CODE_INVALID", "EMAIL_CODE_INVALID"):  # Telethon has no class for these
+                raise
+            print("Wrong code, try again.")
+        except errors.PhoneCodeExpiredError:
+            raise SystemExit("The code has expired. Telegram also expires a code that was sent in any Telegram "
+                             "chat; type it in rather than forwarding or pasting it there.") from None
+
+
+async def _password_login(client):
+    import getpass
+
+    from telethon import errors
+
+    while True:
+        password = getpass.getpass("Two-step verification is on. Cloud password: ")
+        try:
+            return await client.sign_in(password=password)
+        except errors.PasswordHashInvalidError:
+            print("Wrong password, try again.")

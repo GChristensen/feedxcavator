@@ -288,6 +288,8 @@ runs==1.3.0
     # via editor
 screeninfo==0.8.1
     # via camoufox
+segno==1.6.6
+    # via feedxcavator
 six==1.17.0
     # via html5lib
 soupsieve==4.1.1
