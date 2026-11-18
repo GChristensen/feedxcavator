@@ -315,6 +315,26 @@ Feeds that read similar sites can share their common part. `extends: forums/phpb
 into `forums/phpbb.yaml`: keys of the feed replace keys of the template, and maps (such as `selectors` or
 `fetch`) are merged key by key.
 
+A template can hold any key, not only selectors. When it also names the extractor, the tasks and the filter steps,
+each feed only says what differs:
+
+```yaml
+# feeds/forums/lib/phpbb.yaml
+source: https://forum.example.com/viewforum.php?f=
+extractor: phpbb-extractor
+parallel: false
+tasks: [forums]
+filter:
+  - history: {}
+```
+
+```yaml
+# feeds/forums/phpbb-music/feed.yaml
+title: Music forum
+extends: phpbb
+params: {forums: [12, 31]}
+```
+
 ### Group libraries
 
 A group folder under `feeds/` may have its own `lib/` directory. Its code loads before the feeds of the group, and
@@ -352,6 +372,11 @@ A feed without `tasks` is extracted each time its URL is visited. A feed with `t
 background: the result is stored and served when a user or a feed reader visits the URL, and pushed to WebSub
 subscribers. This suits feeds that need complex or slow processing.
 
+A background run replaces the stored output only when it produces headlines. When the extractor raises, the run
+is recorded as failed; when it returns no headlines, nothing is stored. Either way readers keep getting the previous
+output. So an extractor that sees it was blocked should raise rather than return an error headline, unless the
+error headline is what readers should see.
+
 ### Tasks
 
 Tasks are defined in `workspace/tasks.yaml`, or on the **Tasks** tab. A feed belongs to a task when it lists the
@@ -372,7 +397,14 @@ tasks:
     call: aggregate               # a task function defined in code
 ```
 
-A task may also name `pre` and `post` task functions, which run before and after its feed jobs. `timeout` limits
+A task does not have to be declared. A name that appears only in the `tasks` field of feeds is a task too: it
+runs those feeds, and it can be scheduled or listed in `run`. A task that nothing schedules or runs never starts on
+its own, so renaming a feed's task (to `news-off`, say) takes the feed out of the schedule while keeping it
+available for **Run feed task**.
+
+A task may also name `pre` and `post` task functions, which run before and after its feed jobs. A function can
+be listed twice to try it again, as in `pre: [solve-captcha, solve-captcha]`. In Hy a task function is defined
+with `(deftaskfn name [ctx] ...)`. `timeout` limits
 how long the task may run (written like `45s`, `30m` or `2h`). `concurrency` says what happens when the task is
 triggered while it is still running: `skip` (the default) ignores the trigger, `queue` runs the task again after
 the current run, and `allow` starts another run at once.
@@ -429,7 +461,8 @@ namespace. Hy names are translated into Python names by the usual Hy rules, so a
 Every Python library installed in the environment can be imported from either language.
 
 The user library (fetching, selecting, filtering, storage, responses) is available in every file without
-imports. The **API** tab lists it with signatures in both spellings. A few names that Hy mangling cannot produce
+imports. The **API** tab lists it with signatures in both spellings, including small helpers such as `md5`,
+`generate_uuid`, `timestamp` (milliseconds), `safe_call`, `html_sanitize` and `url_encode_utf8`. A few names that Hy mangling cannot produce
 have Hy aliases: `filter-history!` is `filter_history_update` in Python, `store-object!` is `store_object`,
 `str->html` is `parse_html`.
 
@@ -461,6 +494,32 @@ can be given as the first argument: `info` (the default), `warning` or `error`.
 ```python
 log.write("warning", f"no items at {feed.source}")
 ```
+
+### Threads
+
+The current feed, its proxy, the run mode and the cancellation of a task are kept in context variables, which a
+new thread does not inherit. Code that starts threads of its own, to fetch or store many images at once, has to run
+each call in a copy of the context. A thread that touches storage (history, objects, images) opens a database
+connection, which it must close when done:
+
+```python
+import contextvars
+from concurrent.futures import ThreadPoolExecutor
+from django.db import connections
+
+def _in_thread(fn, x):
+    try:
+        return fn(x)
+    finally:
+        connections.close_all()
+
+def pmap(fn, items, workers=4):
+    with ThreadPoolExecutor(workers) as pool:
+        futures = [pool.submit(contextvars.copy_context().run, _in_thread, fn, x) for x in items]
+        return [f.result() for f in futures]
+```
+
+Each call needs its own copy, because one context cannot be entered by two threads at once.
 
 ## Changing headlines with code
 
@@ -542,6 +601,44 @@ def my_first_extractor(feed):
           :key (fn [h] (:title h))))
 ```
 
+`parse_html_page(feed)` reads the feed source when no URL is given. `parse_pages(feed, "/page/{n}", 5,
+include_source=False)` reads pages 1 to 5 the way the `pages` block does; with `include_source=True` (the default)
+it reads the source and then pages 2 to 5. Both apply the feed selectors and return None when nothing could be
+fetched.
+
+An extractor shared by several feeds takes its settings from `params`. When `params` is a map, `param` reads one
+key with a default:
+
+```yaml
+params: {query: python, max-pages: 3}
+```
+
+```hy
+(defextractor search-extractor [feed]
+  (setv pages (int (param feed "max-pages" 1)))
+  ...)
+```
+
+`param(feed, "max_pages", 1)` is the same in Python: a dash and an underscore in the key are interchangeable.
+
+### History in code
+
+The `history` filter step is applied to the final list. An extractor can use the history itself, for example to
+skip linked pages it has already read before fetching them:
+
+- `filter_history_update(key, headlines)` (`filter-history!`) drops the headlines seen before and records all
+  of them.
+- `filter_history(key, headlines)` only drops them, so the code can record later, with `filter-history!`,
+  just the headlines it has actually finished.
+
+`key` is the feed, or any string, which keeps a history of its own: one per forum section, or one shared by several
+feeds. Both functions take `key="guid"` (or another field) and `filter_history_update` also takes `keep` and
+`keep_days`, as the filter step does.
+
+A console **Test** skips only the `history` filter steps. The history functions called from code write the history
+in a test as well, unless the code checks `context.run_mode.get() == "test"` (after `from feedxcavator import
+context`).
+
 ## Fetching and selecting in code
 
 ### Fetching web resources
@@ -609,6 +706,17 @@ proxies:
 In the URL form, special characters in the user name and password must be percent-encoded. Changes take effect
 after a restart.
 
+A proxy can also be defined in workspace code, usually in `lib/`, where it changes with a workspace reload. A
+definition in code takes precedence over one of the same name in `config.yml`:
+
+```hy
+(defproxy work :host "proxy.example.com" :port 3128 :user "me" :password "secret")
+```
+
+```python
+proxy("work", host="proxy.example.com", port=3128, scheme="socks5")
+```
+
 A fetch uses the proxy named by its `proxy` option, otherwise the one named by `fetch.proxy` of the current
 feed. `proxy=False` forces a direct connection. A name that is not defined (or a definition without a host and
 port) fails the fetch with a network error, written to the log, rather than connecting directly; the browser
@@ -643,7 +751,50 @@ deploy a proxy for Feedxcavator, use one that accepts a plain or `dd` secret, su
 `telegrammessenger/proxy` image. In code, `(defproxy tg :scheme "mtproto" :host "..." :port 443 :secret "...")`
 defines one.
 
+## Keeping state
+
+`store_object(key, value)` (`store-object!` in Hy) keeps a JSON value under a string key between runs, and
+`fetch_object(key, default)` reads it back. With `ttl` (seconds) the value expires, which suits a login session
+that should be renewed now and then:
+
+```hy
+(defn session-cookie []
+  (setv cookie (fetch-object "example-session"))
+  (when (is cookie None)
+    (setv cookie (log-in))
+    (store-object! "example-session" cookie :ttl 900))
+  cookie)
+```
+
+`delete_object(key)` (`delete-object!`) removes a value.
+
+A feed can also read what other background feeds have stored. `find_feed(suffix)` returns a feed definition, and
+`fetch_feed_output(feed)` its stored output as `{"output", "content_type"}`. With `output: json` the output parses
+back into headlines. This makes aggregate feeds: one feed that runs after the others (in a task's `then`) and
+merges their results:
+
+```hy
+(import json)
+
+(defextractor digest-extractor [feed]
+  (lfor suffix (:params feed)
+        :setv source (find-feed suffix)
+        :setv stored (when source (fetch-feed-output source))
+        :if stored
+        h (json.loads (:output stored))
+        h))
+```
+
+When the merged result is meant for a program rather than a feed reader, the extractor can store it with
+`store-object!` and return no headlines (with `expect_empty: true` in the feed), and a
+[handler](#handlers) serves the object.
+
 ## Images and media
+
+The `image` field of a headline becomes an enclosure in RSS and Atom (the `image` of an item in JSON Feed). Its type
+is `image_type`, or is guessed from the URL; set `image_type: video/mp4` for a video. Readers differ in what they do
+with enclosures. Some skip one whose URL also appears in the summary, so a video that should play from the
+enclosure is better left out of the summary, with a poster image there instead.
 
 A feed reader loads the images of an item itself, from the reader's computer. That fails when the image exists
 only inside the server (a browser screenshot, a Telegram photo), or when the site refuses requests that do not
@@ -729,6 +880,13 @@ Name the function in `transform` of `feed.yaml` (see [Transform](#transform)) to
 Forwarding suits large or changing media and sites that must see each request; storing suits images that are
 small, made inside the server, or need credentials to fetch.
 
+### Redirect links
+
+`redirect_url(url)` returns a link to this server, `/redirect/<random>/<url>`, that redirects to `url`.
+Readers that accept only web links can then open other targets, such as a link with the custom scheme of a browser
+extension (`ext+myext://open`). The random part makes every link new, so a reader shows the item again each time
+the feed produces it. `redirect_url_b64` encodes the target in Base64.
+
 ## Browsers
 
 Pages that need JavaScript can be opened in a real browser, either with `fetch.backend: browser` in the feed or
@@ -746,9 +904,39 @@ with browser() as b:
       (.apply-selectors feed)))
 ```
 
-A page can also be driven: `goto`, `click`, `fill`, `press`, `wait_for`, `wait`, `scroll`, `evaluate` (with
-`load_js` for scripts kept in files), `screenshot`, `html`, `text` and `url`. The Browser section of the API tab
-describes every method of the browser and the page.
+A page can also be driven: `goto`, `click`, `fill`, `press`, `wait_for`, `wait`, `scroll`, `evaluate`,
+`screenshot`, `html`, `text` and `url`. `page.apply_selectors()` without an argument uses the selectors of the
+current feed. `page.screenshot(selector, type="jpeg", quality=85, style=css)` shoots one element; `style` is CSS
+applied only for the shot, for example to hide a sticky header lying over the element. The Browser section of the
+API tab describes every method of the browser and the page.
+
+### Scripts in files
+
+A longer script lives in a `.js` file next to the code that uses it. The file defines a `main` function, and
+`load_js("name")` (`load-js`) turns it into something `evaluate` can run; the argument of `evaluate` becomes the
+argument of `main`:
+
+```javascript
+// cards.js
+function main({minLength}) {
+    return [...document.querySelectorAll("article")]
+        .map(a => ({title: a.querySelector("h2")?.textContent.trim(), link: a.querySelector("a")?.href}))
+        .filter(h => h.title && h.title.length >= minLength);
+}
+```
+
+```hy
+(.evaluate page (load-js "cards") {"minLength" 10})
+```
+
+`main` may be `async`. The file is read on every call, so edits to it take effect without a workspace reload.
+
+A script can also call the site's own JSON endpoints with `fetch()`. The requests then go out from the page, with
+its cookies and the clearance of a passed security check, which plain `fetch_url` calls may not get.
+
+```hy
+(.evaluate page "async (url) => (await fetch(url)).json()" "/api/items?page=2")
+```
 
 Browsers run in the worker; code in the web process (the console) reaches them over the local RPC. Each
 `with browser()` block starts a browser and closes it at the end.
@@ -757,8 +945,11 @@ After a page is opened, later `fetch_url` calls to the same host reuse the brows
 (kept in memory by the process until it restarts), so a browser can pass a challenge and plain fetches can do
 the rest.
 
-The browser does not use the proxies defined in `config.yml`: `fetch.proxy` has no effect on
-`fetch.backend: browser`.
+`fetch.backend: browser` opens the browser through the feed's `fetch.proxy`. A browser started in code connects
+through a proxy only when it is given one, `browser(proxy="work")` or `(with-browser [b :proxy "work"] ...)`;
+`fetch.proxy` does not apply there. Security checks tie their clearance to the address they saw,
+so a site crawled through a proxy needs its challenge passed through the same proxy
+(`solve_captcha(url, proxy="work")`).
 
 ### Profiles
 
@@ -773,6 +964,10 @@ reuse the session. `chrome-profile.sh [profile] [url]` opens Chrome with a pool 
 playwright engines, and `firefox-profile.sh [profile] [url]` opens Camoufox for the camoufox engine. Close the
 window before the worker uses the profile.
 
+A profile holds one sign-in per site, so two accounts on the same site need two profiles. Feeds that read
+personal pages (a home timeline, recommendations) usually take the profile name from `params`, so one extractor
+serves several accounts.
+
 Profiles are per engine: cookies and sign-ins saved by Chrome do not carry over to camoufox. Use a new profile
 name (or clear the folder) when switching engines, and sign in again.
 
@@ -784,11 +979,31 @@ and reloads the page, which can take ten seconds or more. Wait for the content r
 instead of raising, so the code can reload once or give up. The clearance cookies stay in the profile, so usually
 only the first page of a run waits.
 
+A pattern that holds up on most such sites:
+
+```hy
+(defn open-ready [b url ready [timeout 60]]
+  (setv page (.open b url))
+  (when (not (.wait-for page ready 8 :required False))   ; content shows quickly when no check is due
+    (.solve-captcha page :watch 3)                      ; a Cloudflare challenge, if there is one
+    (or (.wait-for page ready timeout :required False)
+        (do (.goto page url)                            ; one reload, then give up
+            (.wait-for page ready (// timeout 2) :required False))))
+  page)
+```
+
+Wait for an element of the content rather than a fixed time, and give the first page of a run the longest
+timeout. Some sites let a browser through only after it has stayed on a page for a while; opening that page in a
+`with browser()` block of its own, waiting, and then starting the crawl in a new block works, because the
+cookies stay in the profile. A short random pause between pages helps too.
+
 ### Cloudflare challenges
 
 `(solve-captcha url :profile "default")` opens a page in a pool browser and passes a Cloudflare challenge on it
 (the "Just a moment..." page or a Turnstile checkbox); in an open browser, `(.solve-captcha page)` does the same
-for that page. Both return `True` when the page is through.
+for that page. Both return `True` when the page is through. A challenge can appear a few seconds after the page
+has loaded; `watch` is how long to look for one (`solve-captcha` waits 10 seconds by default, the page method
+does not wait).
 
 Turnstile ignores clicks the browser driver makes, so the real pointer is moved and clicked with pyautogui: three
 moves to random points at least 15% of the screen away from its edges, then a click on the checkbox, and a second
@@ -854,8 +1069,8 @@ the file to get a new identity, or after changing the machine's graphics.
 
 ## Telegram
 
-`telegram.get_channel_messages(channel)` returns headlines for the latest messages of a public Telegram channel,
-and `telegram.notify(message, chat_id)` sends a text message. Both need `api-id` and `api-hash` under the
+`telegram.get_channel_messages(channel, limit=26)` returns headlines for the latest messages of a public Telegram
+channel, at most 26, and `telegram.notify(message, chat_id)` sends a text message. Both need `api-id` and `api-hash` under the
 `telegram` key of `config.yml` and a one-time login with `python -m feedxcavator telegram-login`.
 
 ```yaml
@@ -898,7 +1113,7 @@ of the same names. A handler whose only argument is called `request` receives th
 (`method`, `path`, `headers`, `body`, `params`, `json`).
 
 A handler returns one of the response functions (`text_page`, `json_page`, `web_page`, `redirect_to` and others),
-a dict or list that is sent as JSON, or None for an empty response.
+a dict or list that is sent as JSON, None for an empty response, or any other value, which is sent as HTML text.
 
 ```python
 @handler("my-first-handler")
@@ -909,7 +1124,7 @@ def my_first_handler(param):
 
 ### The API token
 
-With `auth=True` (`^:auth` in Hy) the request must carry the API token in the `x-feedxcavator-auth` header. The
+With `auth=True` (`^:auth` or `:auth` before the name in Hy) the request must carry the API token in the `x-feedxcavator-auth` header. The
 token is generated on the Settings tab. It is stored hashed and shown only once, so copy it when it appears.
 
 This handler gives the stored output of a background feed to an external program and takes the processed output
@@ -989,6 +1204,28 @@ transform: shout
 ```hy
 (defn shout [headline]
   (assoc headline "title" (.upper (:title headline))))
+```
+
+A feed that reports the day's warnings and errors from the log, so that problems show up in the reader. Put it in
+a task that runs after the others, with `expect_empty: true`: on a quiet day it finds nothing, and the stored
+report stays as it was. The log is the
+Django model `LogEntry`, with `timestamp` in milliseconds.
+
+```hy
+(import datetime [datetime date]
+        feedxcavator.models [LogEntry])
+
+(defextractor health-extractor [feed]
+  (setv midnight (int (* 1000 (.timestamp (datetime.combine (date.today) (.time datetime.min)))))
+        entries (list (.order-by (.filter LogEntry.objects :timestamp__gt midnight
+                                          :level__in ["error" "warning"])
+                                 "id")))
+  (if entries
+      [{"title" (+ "Health report: " (str (len entries)) " messages")
+        "link" (+ (get-app-host) "/console#log")
+        "guid" (str (. (get entries -1) id))
+        "summary" (.join "<hr>" (gfor e entries (html-sanitize e.message)))}]
+      []))
 ```
 
 A task function that runs after the morning feeds:

@@ -154,6 +154,9 @@ def test_hy_dsl(ws):
    "freq" (frequencies ["a" "b" "a"])
    "safe" (safe-call (/ 1 0))
    "repeat" (safely-repeat (/ 1 0))
+   "param" (do (setv f {"params" {"max-pages" 3 "page_size" 5}})
+               [(param f "max-pages") (param f "max_pages") (param f "page-size") (param f "x" 7)
+                (param {"params" [1 2]} "x" 8) (param None "x")])
    "original" h})
 """,
     }, startup=True)
@@ -174,6 +177,7 @@ def test_hy_dsl(ws):
     assert result["keep"] == [2, 3] and result["mapcat"] == [1, 1, 2, 2]
     assert result["partition"] == [[1, 2], [3, 4]] and result["group"] == {1: [1, 3], 0: [2]}
     assert result["freq"] == {"a": 2, "b": 1} and result["safe"] is None and result["repeat"] is None
+    assert result["param"] == [3, 3, 5, 7, 8, None]
 
 
 def test_load_js_reads_next_to_the_calling_file(ws):

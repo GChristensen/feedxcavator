@@ -15,6 +15,7 @@ import re
 import secrets
 import time
 import traceback
+from collections.abc import Mapping
 from urllib.parse import quote
 
 from feedxcavator import (applog, conf, context, extraction, fetch, filters, output, reply, selectors as sel,
@@ -250,6 +251,19 @@ def forward_url_b64(url, referer, https=False, proxy=None):
 def find_feed(suffix_or_title):
     """Finds a feed by suffix, then by title."""
     return workspace.get_registry().find_feed(suffix_or_title)
+
+
+def param(feed, key, default=None):
+    """A value of the feed's `params` map, by its key as written in feed.yaml: (param feed "max-pages") or
+    param(feed, "max_pages"). `default` when the key is missing or `params` is not a map."""
+    params = feed.get("params") if feed is not None else None
+    if not isinstance(params, Mapping):
+        return default
+    key = str(key)
+    for k in (key, key.replace("_", "-"), key.replace("-", "_")):
+        if k in params:
+            return params[k]
+    return default
 
 
 def fetch_feed_output(feed):
@@ -519,7 +533,7 @@ CATEGORIES = [
                    sel.parse_date]),
     ("Extraction", [extraction.parse_html_page, extraction.parse_pages, extraction.parse_page_range,
                     extraction.fetch_document, extraction.default_feed_parser, output.produce_feed_output,
-                    output.xml_format]),
+                    output.xml_format, param]),
     ("Filtering", [filters.filter_history, filters.filter_history_update, filters.filter_history_by_guid_update,
                    filters.filter_content, filters.filter_headlines, filters.add_filter_word,
                    filters.remove_filter_word, filters.add_filter_regex, filters.remove_filter_regex,
