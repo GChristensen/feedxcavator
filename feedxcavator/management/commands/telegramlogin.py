@@ -1,4 +1,4 @@
-"""TG-6: the interactive Telegram login."""
+"""The interactive Telegram login."""
 
 from django.core.management.base import BaseCommand
 

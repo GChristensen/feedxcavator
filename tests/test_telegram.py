@@ -1,4 +1,4 @@
-"""TG-6: the interactive login, with a fake Telethon client."""
+"""The interactive login, with a fake Telethon client."""
 
 import datetime as dt
 

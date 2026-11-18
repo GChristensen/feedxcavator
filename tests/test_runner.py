@@ -95,17 +95,17 @@ def test_task_run_order_and_records(http, ws, runner):
     assert runner.wait_idle(10)
     assert run.status == "ok"
     events = registry.namespace["EVENTS"]
-    assert events[0] == ("pre", "morning", "manual", ["a", "b", "bad", "c", "empty", "quiet"])  # TSK2-6a
-    assert events[1][0] == "post" and events[2] == ("call",)  # TSK2-6c: pre, jobs, post, then
+    assert events[0] == ("pre", "morning", "manual", ["a", "b", "bad", "c", "empty", "quiet"])  # pre gets the selected feeds
+    assert events[1][0] == "post" and events[2] == ("call",)  # pre, jobs, post, then
     assert events[1][2] == [("a", "ok", 1), ("b", "ok", 1), ("bad", "error", 0), ("c", "ok", 1),
-                            ("empty", "ok", 0), ("quiet", "ok", 0)]  # TSK2-6b
+                            ("empty", "ok", 0), ("quiet", "ok", 0)]  # post gets the results
 
     runs = {r.task: r for r in TaskRun.objects.all()}
     assert set(runs) == {"morning", "news", "articles", "after"}
     assert runs["news"].parent_id == run.id and runs["news"].trigger == "subtask"
     assert runs["after"].trigger == "then" and runs["after"].status == "ok"
     bad = FeedRun.objects.get(feed_title="bad")
-    assert bad.status == "error" and "extractor exploded" in bad.error  # TSK-7: other jobs are unaffected
+    assert bad.status == "error" and "extractor exploded" in bad.error  # other jobs are unaffected
     assert FeedRun.objects.get(feed_title="quiet").expect_empty
     assert storage.fetch_feed_output(registry.feeds["a"].key)["item_count"] == 1
     assert storage.fetch_feed_output(registry.feeds["empty"].key) is None
@@ -113,7 +113,7 @@ def test_task_run_order_and_records(http, ws, runner):
     assert LogEntry.objects.filter(source="boom", level="error").count() == 1  # the logging source
     zero = list(LogEntry.objects.filter(level="warning", message__contains="zero headlines")
                 .values_list("message", flat=True))
-    assert zero == ["empty: zero headlines"]  # TSK2-8: not for expect_empty or failed feeds
+    assert zero == ["empty: zero headlines"]  # not for expect_empty or failed feeds
 
 
 def test_pre_and_post_outcomes(http, ws, runner):
@@ -165,9 +165,9 @@ def test_timeout_cancels_jobs_and_post_still_runs(http, ws, runner):
     assert time.monotonic() - started < 4
     assert run.status == "timeout"
     statuses = dict(FeedRun.objects.values_list("feed_title", "status"))
-    assert statuses == {"slow": "timeout", "fast": "ok"}  # TSK2-7
+    assert statuses == {"slow": "timeout", "fast": "ok"}
     post = next(e for e in registry.namespace["EVENTS"] if e[0] == "post")
-    assert ("slow", "timeout", None) in post[2] and ("fast", "ok", 1) in post[2]  # TSK2-6b
+    assert ("slow", "timeout", None) in post[2] and ("fast", "ok", 1) in post[2]  # post still runs after a timeout
     warning = LogEntry.objects.get(source="t", level="warning")
     assert warning.message == "task t timed out; feeds not finished: slow"
     registry.namespace["GATE"].set()  # the late job must neither store output nor change its record
@@ -200,15 +200,15 @@ def test_concurrency_policies(http, ws, runner):
         second.join(10)
         return during, sorted(TaskRun.objects.values_list("status", flat=True))
 
-    assert overlap("skipper") == (["running", "skipped"], ["ok", "skipped"])  # TSK2-5
+    assert overlap("skipper") == (["running", "skipped"], ["ok", "skipped"])  # concurrency: skip
     assert overlap("queued") == (["running"], ["ok", "ok"])
     assert overlap("parallel") == (["running", "running"], ["ok", "ok"])
 
 
 def test_cycle_and_unknown_tasks(ws, runner):
     ws({"tasks.yaml": "tasks:\n  a: {run: [b]}\n  b: {run: [a]}\n"}, startup=True)
-    assert runner.run("a").status == "failed"  # TSK2-3
-    assert runner.run("nothing-here").status == "ok"  # TSK-2
+    assert runner.run("a").status == "failed"  # a cycle
+    assert runner.run("nothing-here").status == "ok"  # a task without feeds
 
 
 def test_scheduler_and_queue(ws):
@@ -222,20 +222,20 @@ def test_scheduler_and_queue(ws):
     now = timezone.now()
     scheduler.tick(now + timedelta(minutes=5, seconds=1))
     assert fired == ["news"]
-    assert ScheduleState.objects.get(key__startswith="news|").last_fired_at is not None  # SCH2-5
+    assert ScheduleState.objects.get(key__startswith="news|").last_fired_at is not None
     scheduler.tick(now + timedelta(minutes=5, seconds=2))
     assert fired == ["news"]  # fires once per slot
     scheduler.tick(now + timedelta(minutes=65))
     assert sorted(fired) == ["missed", "news", "news"]
 
-    # a new worker start after downtime: run-once fires once, skip does not (SCH2-3)
+    # a new worker start after downtime: run-once fires once, skip does not
     ScheduleState.objects.update(last_fired_at=now - timedelta(hours=5))
     fired.clear()
     restarted = worker.Scheduler(fired.append)
     restarted.reload()
     assert fired == ["missed"]
     restarted.reload()
-    assert fired == ["missed"]  # SCH-6: a reload does not fire again
+    assert fired == ["missed"]  # a reload does not fire again
 
     worker.enqueue_task("news", "manual")
     worker.enqueue("service-task")
@@ -265,7 +265,7 @@ def test_service_task(ws):
     assert Blob.objects.count() == 1 and not storage.blob_path(old.sha256).exists()
     assert storage.fetch_object("kept") == {"a": [1]} and storage.fetch_object("gone", "default") == "default"
     entry = LogEntry.objects.get(source="service-task")
-    assert entry.level == "info" and "purged 1 of 1 images" in entry.message  # MNT-1
+    assert entry.level == "info" and "purged 1 of 1 images" in entry.message
 
 
 def test_service_task_max_age_setting(ws, monkeypatch):
@@ -312,10 +312,10 @@ def test_service_task_enabled(monkeypatch):
 def test_blobs_share_identical_content():
     first = storage.store_blob(b"same bytes", "image/jpeg", "tg://c/1")
     second = storage.store_blob(b"same bytes", "image/jpeg")
-    assert first.sha256 == second.sha256 and first.id != second.id  # STO2-11
+    assert first.sha256 == second.sha256 and first.id != second.id  # identical content is stored once
     assert storage.find_blob_by_source("tg://c/1").id == first.id
     storage.delete_blob(first)
     assert storage.blob_path(second.sha256).exists()
     storage.delete_blob(second)
     assert not storage.blob_path(second.sha256).exists()
-    assert storage.sanitize_path("a b/c:d?.jpg") == "a_b/c_d_.jpg"  # STO-6
+    assert storage.sanitize_path("a b/c:d?.jpg") == "a_b/c_d_.jpg"

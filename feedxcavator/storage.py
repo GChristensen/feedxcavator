@@ -1,4 +1,4 @@
-"""Payload files, blobs, stored feed output and the key-value store (OUT-6, STO2-10, STO2-11, STO-4 to STO-6)."""
+"""Payload files, blobs, stored feed output and the key-value store."""
 
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ TMP_SUFFIX = re.compile(r"\.[0-9a-f]{32}\.tmp$")
 
 
 def sanitize_path(path: str) -> str:
-    """STO-6: everything but letters, digits, `-`, `_`, `.`, `/` and `\\` becomes `_`."""
+    """Everything but letters, digits, `-`, `_`, `.`, `/` and `\\` becomes `_`."""
     return _UNSAFE.sub("_", path)
 
 
@@ -29,7 +29,7 @@ def new_id() -> str:
 
 
 def write_atomic(path: Path, data: bytes | str):
-    """STO-4: write to `<name>.<32 hex>.tmp` in the same directory, then move into place."""
+    """Writes to `<name>.<32 hex>.tmp` in the same directory, then moves it into place."""
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_name(f"{path.name}.{uuid.uuid4().hex}.tmp")
@@ -157,7 +157,7 @@ def blob_path(sha256: str) -> Path:
 
 
 def store_blob(data: bytes, content_type: str = "", source_url: str = "", blob_id: str | None = None):
-    """STO-5: the file is written before its record. Identical content is stored once."""
+    """The file is written before its record. Identical content is stored once."""
     from feedxcavator.models import Blob
 
     digest = hashlib.sha256(data).hexdigest()

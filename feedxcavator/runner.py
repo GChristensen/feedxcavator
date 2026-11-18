@@ -1,4 +1,4 @@
-"""Running tasks in the worker (PORT-REQUIREMENTS section 11, TSK-6, TSK-7)."""
+"""Running tasks in the worker."""
 
 from __future__ import annotations
 
@@ -17,7 +17,7 @@ logger = logging.getLogger("feedxcavator.runner")
 
 
 class TaskContext(dict):
-    """What `pre` and `post` functions receive: task, trigger, feeds, and results for `post` (TSK2-6a/b)."""
+    """What `pre` and `post` functions receive: task, trigger, feeds, and results for `post`."""
 
     __getattr__ = dict.get
 
@@ -34,7 +34,7 @@ class TaskRunner:
     # entry points -------------------------------------------------------------------------
 
     def enqueue(self, name: str, trigger: str = "manual") -> threading.Thread:
-        """TSK-8: starts a task run and returns immediately."""
+        """Starts a task run and returns immediately."""
 
         def target():
             try:
@@ -65,7 +65,7 @@ class TaskRunner:
 
     def run(self, name: str, trigger: str = "manual", parent=None, deadline: float | None = None,
             registry=None):
-        """Runs a task to completion: pre, feed jobs and subtasks, post, then (TSK2-6c).
+        """Runs a task to completion: pre, feed jobs and subtasks, post, then the `then` tasks.
         Returns the TaskRun record."""
         from feedxcavator.models import TaskRun
 
@@ -83,7 +83,7 @@ class TaskRunner:
                 applog.write("error", f"Task {task.name} was not run: {task.error}")
             return record("failed", task.error)
 
-        # TSK2-5
+        # concurrency: overlapping runs of the same task are skipped, queued or allowed
         queue_lock = None
         if task.concurrency == "queue":
             with self._lock:
@@ -134,7 +134,7 @@ class TaskRunner:
             with context.scope(source=fn_name, task_run=run.id):
                 return fn.fn(*args)
 
-        # pre (TSK2-6a)
+        # pre
         try:
             for fn_name in task.pre:
                 if call(fn_name, ctx) is False:
@@ -144,7 +144,7 @@ class TaskRunner:
                 applog.write("error", e)
             return finish("failed", f"pre: {type(e).__name__}: {e}")
 
-        # feed jobs, the `call` function, and subtasks all start together (TSK-4)
+        # feed jobs, the `call` function, and subtasks all start together
         cancel = threading.Event()
         futures = {}
         for feed in own_feeds:
@@ -172,7 +172,7 @@ class TaskRunner:
         remaining = (deadline - time.monotonic()) if deadline else None
         done, not_done = wait(pending, timeout=max(0.0, remaining) if remaining is not None else None)
         timed_out = bool(not_done)
-        if timed_out:  # TSK2-7
+        if timed_out:
             cancel.set()
             for future in not_done:
                 future.cancel()
@@ -220,7 +220,7 @@ class TaskRunner:
         if any(getattr(r, "status", None) == "failed" for r in sub_results.values()) and status == "ok":
             status, error = "failed", "a subtask failed"
 
-        # post (TSK2-6b): runs whether the jobs succeeded or not, bounded by post_timeout
+        # post: runs whether the jobs succeeded or not, bounded by post_timeout
         if task.post:
             failure = self._run_post(task, call, ctx)
             if failure:
@@ -229,7 +229,7 @@ class TaskRunner:
                 return finish("failed", f"post: {failure}")
 
         finish(status, error)
-        for name in task.then:  # TSK2-4
+        for name in task.then:
             self.enqueue(name, "then")
         return run
 
@@ -274,7 +274,7 @@ class TaskRunner:
             connection.close()
 
     def _feed_job(self, registry, feed, run_id, cancel):
-        """TSK-7: one feed, extracted in background mode under the logging source of its extractor."""
+        """One feed, extracted in background mode under the logging source of its extractor."""
         from feedxcavator.models import FeedRun
 
         record = FeedRun.objects.create(
@@ -290,7 +290,7 @@ class TaskRunner:
                     if result.error:
                         status, error = "error", result.error
                         applog.write("error", f"{feed.get('suffix')}: {result.error}")
-                    elif not count and not feed.get("expect_empty"):  # TSK-9, TSK2-8: same rule as the Runs tab
+                    elif not count and not feed.get("expect_empty"):  # same rule as the Runs tab
                         applog.write("warning", f"{feed.get('suffix')}: zero headlines")
                 except context.JobCancelled:
                     status, error = "timeout", "the task run timed out"
@@ -327,7 +327,7 @@ def _accepts_argument(call, fn_name) -> bool:
 
 
 def prune_runs(days: int | None = None) -> int:
-    """STO2-6: run records are pruned after `run-history-days`."""
+    """Run records are pruned after `run-history-days`."""
     from feedxcavator.models import TaskRun
 
     days = days if days is not None else int(conf.get("run-history-days", 30))

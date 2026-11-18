@@ -1,4 +1,4 @@
-"""The web process: the ASGI application (PRC-1)."""
+"""The web process: the ASGI application."""
 
 import os
 
@@ -15,7 +15,7 @@ applog.install_excepthooks()
 applog.install_stdout()
 if not os.environ.get("FEEDXCAVATOR_NO_AUTOLOAD"):
     workspace.ensure_layout()
-    workspace.load(startup=True)  # UC2-6: user code loads at startup
+    workspace.load(startup=True)  # user code loads at startup
     workspace.start_watcher()
 
 application = get_asgi_application()

@@ -1,4 +1,4 @@
-"""Response builders for handlers (UC-7)."""
+"""Response builders for handlers."""
 
 from __future__ import annotations
 

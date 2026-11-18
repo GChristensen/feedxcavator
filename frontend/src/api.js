@@ -1,4 +1,4 @@
-// The console API client (API2-1). Mutating requests carry the CSRF token (AUTH2-3).
+// The console API client. Mutating requests carry the CSRF token.
 
 const BASE = '/front/api'
 

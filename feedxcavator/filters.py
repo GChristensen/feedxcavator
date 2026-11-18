@@ -1,4 +1,4 @@
-"""Headline filtering: history, word filters and the filter steps (FD2-10, FD2-11, WF-1, WF-2)."""
+"""Headline filtering: history, word filters and the filter steps."""
 
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ def _sha(value) -> str:
 
 
 def history_namespace(feed_or_key) -> str:
-    """UC-8: a feed (keyed by its id when it has one, else by its suffix) or any string."""
+    """A history key: a feed (keyed by its id when it has one, else by its suffix) or any string."""
     key = feed_or_key if isinstance(feed_or_key, str) else (feed_or_key.get("key") or feed_or_key.get("id"))
     return _sha(key)
 
@@ -156,7 +156,7 @@ def remove_filter_regex(*args):
 
 
 def list_word_filter(name="default") -> list[str]:
-    """Entries of a word filter. Regular expressions are returned as their source text (WF-2)."""
+    """Entries of a word filter. Regular expressions are returned as their source text."""
     from feedxcavator.models import WordFilterEntry
 
     return list(WordFilterEntry.objects.filter(filter__name=name).order_by("id").values_list("value", flat=True))
@@ -234,7 +234,7 @@ def load_matchers(name="default") -> list:
 
 
 def matches_filter(value, matchers) -> bool:
-    """WF-1: a word matches when the lower-cased field contains it, a regex when it is found in it."""
+    """A word matches when the lower-cased field contains it, a regex when it is found in it."""
     if not value or not matchers:
         return False
     value = str(value).lower()
@@ -264,7 +264,7 @@ def filter_content(feed, headlines, name=None, fields=None):
 
 
 def filter_headlines(feed, headlines, testing=None):
-    """Runs the `filter` steps of a feed in order. A console test skips the history steps (FD-20)."""
+    """Runs the `filter` steps of a feed in order. A console test skips the history steps."""
     headlines = list(headlines or [])
     steps = feed.get("filter") if feed is not None else None
     if not steps:

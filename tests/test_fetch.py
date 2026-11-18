@@ -43,7 +43,7 @@ def test_success_and_conversions(transport):
     raw = fetch.fetch_url("http://t.test/")
     assert raw.status == 200 and raw["final-url"] == "http://t.test/" and raw.content_type.startswith("text/html")
     with pytest.raises(ValueError):
-        fetch.fetch_url("http://t.test/", as_="edn")  # FT2-3
+        fetch.fetch_url("http://t.test/", as_="edn")  # edn is not supported
 
 
 def test_http_error_never_raises_and_records_state(transport):
@@ -81,7 +81,7 @@ def test_retry_after(transport):
     transport.responses = [response(429, headers={"Retry-After": "2"}), response(200)]
     transport.sleeps.clear()
     assert fetch.fetch_url("http://t.test/") is not None
-    assert 2.0 <= transport.sleeps[0] <= 2.2  # never shorter, extended by up to 10% (FT-5)
+    assert 2.0 <= transport.sleeps[0] <= 2.2  # never shorter, extended by up to 10%
 
     transport.calls.clear()
     transport.responses = [response(429, headers={"Retry-After": "11"})]
@@ -99,7 +99,7 @@ def test_retry_after(transport):
 def test_charset_auto_detection(transport):
     cyrillic = "Привет".encode("windows-1251")
     transport.responses = [response(body=cyrillic, headers={"Content-Type": "text/html; charset=windows-1251"})]
-    assert fetch.fetch_url("http://t.test/", as_="string") == "Привет"  # from the response (fixes 17.4)
+    assert fetch.fetch_url("http://t.test/", as_="string") == "Привет"  # the charset of the response
     transport.responses = [response(body=b'<meta charset="windows-1251">' + cyrillic,
                                     headers={"Content-Type": "text/html"})]
     assert fetch.fetch_url("http://t.test/", as_="string").endswith("Привет")  # from the document
@@ -118,7 +118,7 @@ def test_feed_defaults_and_proxy(transport, monkeypatch):
         assert transport.calls[-1]["impersonate"] == "firefox" and transport.calls[-1]["timeout"] == 7
         fetch.fetch_url("http://t.test/", proxy=False, impersonate="safari", timeout=1500)
         assert transport.calls[-1]["proxy"] is None and transport.calls[-1]["impersonate"] == "safari"
-        assert transport.calls[-1]["timeout"] == 1.5  # the option is in milliseconds (FT-1)
+        assert transport.calls[-1]["timeout"] == 1.5  # the option is in milliseconds
     fetch.fetch_url("http://t.test/")
     assert transport.calls[-1]["proxy"] is None and transport.calls[-1]["impersonate"] == "chrome"
 
@@ -187,7 +187,7 @@ def test_telegram_proxy_choice(monkeypatch):
     from feedxcavator import conf, context, telegram
 
     monkeypatch.setitem(conf.config, "telegram", None)
-    assert telegram.proxy_name() is None  # TG2-1: a direct connection unless something names a proxy
+    assert telegram.proxy_name() is None  # a direct connection unless something names a proxy
     with context.scope(feed={"fetch": {"proxy": "work"}}):
         assert telegram.proxy_name() == "work"
         assert telegram.proxy_name("other") == "other" and telegram.proxy_name(False) is False
@@ -248,7 +248,7 @@ def test_browser_session_hand_over(transport):
     fetch.fetch_url("https://other.test/")
     assert transport.calls[-1]["cookies"] == {}
     transport.responses = [response(403)]
-    fetch.fetch_url("https://shop.test/list")  # rejected: the session is dropped (BRW-5)
+    fetch.fetch_url("https://shop.test/list")  # rejected: the session is dropped
     transport.responses = [response()]
     fetch.fetch_url("https://shop.test/list")
     assert transport.calls[-1]["cookies"] == {}

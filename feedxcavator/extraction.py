@@ -1,4 +1,4 @@
-"""Extraction flow: the built-in extractor, pagination, full text, and the run modes of EX-4."""
+"""Extraction flow: the built-in extractor, pagination, full text, and the run modes."""
 
 from __future__ import annotations
 
@@ -91,7 +91,7 @@ def _browser_document(feed, url, opts):
             if _wants_json(feed):
                 return _browser_json(page), final_url
             return Selector(text=page.html()), final_url
-    except browser.BrowserError as e:  # EX-3: reported as a network error, like a failed HTTP fetch
+    except browser.BrowserError as e:  # reported as a network error, like a failed HTTP fetch
         state.network_error = e
         return None, url
     except ValueError as e:  # the page is not JSON
@@ -154,7 +154,7 @@ def _page_url(source: str, path, n: int) -> str:
 
 def parse_page_range(feed, path, start, end, include_source=True, increment=1, parser=None, delay=None,
                      useragent=None, source=None):
-    """Reads several pages and concatenates their headlines (FD-16, FD-17). `path` is a template
+    """Reads several pages and concatenates their headlines. `path` is a template
     appended to the source, with `{n}` (or `%n`) replaced by the page number, or a function of it."""
     parser = parser or parse_html_page
     start = 2 if start is None else start
@@ -184,7 +184,7 @@ def parse_pages(feed, path, n_pages, include_source=True, increment=1, parser=No
 
 
 def _follow_next(feed, source, pages):
-    """FD2-9: follows the `next` link for up to `max` pages."""
+    """Follows the `next` link for up to `max` pages."""
     headlines, url, seen = [], source, set()
     fetched_any = False
     for index in range(max(1, pages.get("max") or 1)):
@@ -227,7 +227,7 @@ def default_feed_parser(feed):
 
 
 def error_headlines() -> list[dict]:
-    """EX-3."""
+    """The single `Error` headline of a failed fetch, or an empty list."""
     state = context.fetch_state()
     if state.network_error is not None:
         summary = "Network error."
@@ -242,7 +242,7 @@ def error_headlines() -> list[dict]:
 
 
 def apply_fulltext(feed, headlines):
-    """AUTO-3: replaces the summary (or fills `content`) with the main text of the linked page."""
+    """Replaces the summary (or fills `content`) with the main text of the linked page."""
     options = feed.get("fulltext")
     if not options or not options.get("enabled"):
         return headlines
@@ -327,7 +327,7 @@ def _call_extractor(feed, registry):
 
 
 def publish(feed, headlines, result: dict):
-    """WS-6, WS-7: pushes stored output to WebSub subscribers, in parts when `partition` is set."""
+    """Pushes stored output to WebSub subscribers, in parts when `partition` is set."""
     from feedxcavator import websub
 
     options = feed.get("websub")
@@ -346,13 +346,13 @@ def publish(feed, headlines, result: dict):
                 websub.publish_content(feed, output.produce_feed_output(feed, part))
         else:
             websub.publish_content(feed, result)
-    except Exception as e:  # noqa: BLE001 - WS-8: a failed delivery must not fail the job
+    except Exception as e:  # noqa: BLE001 - a failed delivery must not fail the job
         with context.scope(source="websub"):
             applog.write("error", e)
 
 
 def run_feed(feed, mode: str, registry=None) -> Result:
-    """Extracts a feed in one of the modes of EX-4: `request` (a feed URL of a feed without tasks),
+    """Extracts a feed in one of three modes: `request` (a feed URL of a feed without tasks),
     `background` (a task) or `test` (the console)."""
     from feedxcavator import workspace
 

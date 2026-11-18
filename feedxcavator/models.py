@@ -1,10 +1,10 @@
-"""Database models (PORT-REQUIREMENTS section 14)."""
+"""Database models."""
 
 from django.db import models
 
 
 class FeedIndex(models.Model):
-    """STO2-2. A cache of the parsed feeds, rebuilt from the workspace on each load."""
+    """A cache of the parsed feeds, rebuilt from the workspace on each load."""
 
     id = models.CharField(primary_key=True, max_length=255)  # the feed key: its id, or its suffix
     suffix = models.CharField(max_length=255, unique=True, null=True)
@@ -20,7 +20,7 @@ class FeedIndex(models.Model):
 
 
 class FeedOutput(models.Model):
-    """STO2-3. The document itself is the file data/files/feed/<feed-id> (OUT-6)."""
+    """Stored feed output. The document itself is the file data/files/feed/<feed key>."""
 
     feed_id = models.CharField(primary_key=True, max_length=255)
     content_type = models.CharField(max_length=128)
@@ -29,7 +29,7 @@ class FeedOutput(models.Model):
 
 
 class HistoryKey(models.Model):
-    """STO2-4."""
+    """The history of a feed or of any string key: hashes of the headlines already seen."""
 
     namespace = models.CharField(max_length=64)
     key_hash = models.CharField(max_length=64)
@@ -41,7 +41,7 @@ class HistoryKey(models.Model):
 
 
 class TaskRun(models.Model):
-    """STO2-6."""
+    """A task run. Its feed jobs are FeedRun rows."""
 
     task = models.CharField(max_length=255, db_index=True)
     trigger = models.CharField(max_length=16)  # schedule | manual | then | subtask
@@ -66,7 +66,7 @@ class FeedRun(models.Model):
 
 
 class ScheduleState(models.Model):
-    """STO2-7. `key` is task|cron|timezone."""
+    """The last firing of a schedule. `key` is task|cron|timezone."""
 
     key = models.CharField(primary_key=True, max_length=512)
     first_seen_at = models.DateTimeField()
@@ -74,7 +74,7 @@ class ScheduleState(models.Model):
 
 
 class Subscription(models.Model):
-    """STO2-8."""
+    """A WebSub subscription."""
 
     feed_id = models.CharField(max_length=255, db_index=True)
     topic = models.CharField(max_length=2048)
@@ -90,7 +90,7 @@ class Subscription(models.Model):
 
 
 class WordFilter(models.Model):
-    """STO2-9."""
+    """A word filter: words and regular expressions."""
 
     name = models.CharField(max_length=255, unique=True)
 
@@ -105,7 +105,7 @@ class WordFilterEntry(models.Model):
 
 
 class KVObject(models.Model):
-    """STO2-10."""
+    """A JSON value in the key-value store, optionally expiring."""
 
     namespace = models.CharField(max_length=255, default="default")
     key = models.CharField(max_length=1024)
@@ -118,7 +118,7 @@ class KVObject(models.Model):
 
 
 class Blob(models.Model):
-    """STO2-11. The file is data/files/blob/<sha256>."""
+    """A stored image. The file is data/files/blob/<sha256>."""
 
     id = models.CharField(primary_key=True, max_length=64)
     sha256 = models.CharField(max_length=64, db_index=True)
@@ -129,7 +129,7 @@ class Blob(models.Model):
 
 
 class LogEntry(models.Model):
-    """STO2-12. `id` is the sequence number of LOG-2, `timestamp` is in milliseconds."""
+    """An application log entry. `id` is its sequence number, `timestamp` is in milliseconds."""
 
     level = models.CharField(max_length=8, db_index=True)
     source = models.CharField(max_length=255, blank=True, default="", db_index=True)
@@ -139,7 +139,7 @@ class LogEntry(models.Model):
 
 
 class Settings(models.Model):
-    """STO2-13. A single row with id 1."""
+    """The console settings. A single row with id 1."""
 
     subscription_url = models.CharField(max_length=2048, blank=True, default="")
 
@@ -149,14 +149,14 @@ class Settings(models.Model):
 
 
 class ApiToken(models.Model):
-    """STO2-14. Only the SHA-256 of the token is stored."""
+    """The API token. Only the SHA-256 of the token is stored."""
 
     token_hash = models.CharField(max_length=64)
     created_at = models.DateTimeField()
 
 
 class QueueItem(models.Model):
-    """Requests from the web process to the worker (PRC-3)."""
+    """Requests from the web process to the worker."""
 
     kind = models.CharField(max_length=32)  # task | reschedule | service-task
     payload = models.JSONField(default=dict)

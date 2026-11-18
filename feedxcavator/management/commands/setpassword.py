@@ -1,4 +1,4 @@
-"""AUTH2-1: sets the password of the single user."""
+"""Sets the password of the single user."""
 
 import getpass
 

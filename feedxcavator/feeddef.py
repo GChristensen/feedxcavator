@@ -1,4 +1,4 @@
-"""Feed definitions: parsing, validation and the Feed object (PORT-REQUIREMENTS section 7)."""
+"""Feed definitions: parsing, validation and the Feed object."""
 
 from __future__ import annotations
 
@@ -337,7 +337,7 @@ def json_schema() -> dict:
 
 
 def normalize(raw: dict) -> dict:
-    """Rewrites the 3.0.0 spellings into the current fields (FD2-5, FD2-10)."""
+    """Rewrites the 3.0.0 spellings into the current fields."""
     data = dict(raw)
     if "post-process" in data and "post_process" not in data:
         data["post_process"] = data.pop("post-process")
@@ -362,7 +362,7 @@ def normalize(raw: dict) -> dict:
             if value is not None:
                 fetch.setdefault(key, value)
         data["fetch"] = fetch
-    data.pop("group", None)  # the group is the directory now (WS2-3)
+    data.pop("group", None)  # the group is the directory now
     flt = data.get("filter")
     if isinstance(flt, dict):  # the map form of 3.0.0
         steps = []
@@ -376,7 +376,7 @@ def normalize(raw: dict) -> dict:
 
 
 def deep_merge(base, over):
-    """FD2-6: maps merge, other values replace."""
+    """Merges a template under a definition: maps merge, other values replace."""
     if isinstance(base, dict) and isinstance(over, dict):
         merged = dict(base)
         for key, value in over.items():
@@ -390,7 +390,7 @@ def resolve_extends(data: dict, load_template, _seen=(), _files=()) -> dict:
 
     A loader with a `locate(name, files)` attribute (workspace.template_loader) resolves names
     from where the referring template lives, skipping the template files already in the chain, so
-    a group template can extend a template of the same name further out (WS2-9). It returns
+    a group template can extend a template of the same name further out. It returns
     `(template, loader for the template's own extends, file)`, or None when only files already in
     the chain match."""
     name = data.get("extends")
@@ -529,7 +529,7 @@ def set_suffix(text: str, suffix: str) -> str:
 
 
 class Feed(Mapping):
-    """A read-only feed (UC2-19): fields are available as attributes and by key, extra fields included.
+    """A read-only feed: fields are available as attributes and by key, extra fields included.
     A missing field reads as None."""
 
     __slots__ = ("_data",)

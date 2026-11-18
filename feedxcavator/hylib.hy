@@ -1,4 +1,4 @@
-;; The Hy DSL of the prelude (PORT-REQUIREMENTS section 6). These macros are required into every
+;; The Hy DSL of the prelude. These macros are required into every
 ;; user file. `_fx` is the feedxcavator.userlib module, placed in the user namespace by the prelude.
 
 (import hy.models [Expression Symbol String List Keyword Dict])
@@ -69,7 +69,7 @@
   `(_fx.safely-repeat (fn [] ~form) 3))
 
 (defn _fx-selector [selector]
-  "A literal selector is checked at expansion time (SEL-11); an Enlive vector becomes CSS (SEL-12)."
+  "A literal selector is checked at expansion time; an Enlive vector becomes CSS."
   (import feedxcavator.selectors :as sel)
   (cond
     (isinstance selector String)

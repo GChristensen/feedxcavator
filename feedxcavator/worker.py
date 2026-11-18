@@ -1,4 +1,4 @@
-"""The worker process: scheduler, task queue, browser pool, Telegram (PRC-1, PRC-3)."""
+"""The worker process: scheduler, task queue, browser pool, Telegram."""
 
 from __future__ import annotations
 
@@ -22,7 +22,7 @@ POLL_SECONDS = 1.0
 
 
 def enqueue(kind: str, **payload):
-    """Called by the web process: the request reaches the worker through the database (PRC-3)."""
+    """Called by the web process: the request reaches the worker through the database."""
     from feedxcavator.models import QueueItem
 
     QueueItem.objects.create(kind=kind, payload=payload, created_at=timezone.now())
@@ -44,7 +44,7 @@ class Scheduler:
 
     @staticmethod
     def _next_service():
-        """MNT-2: daily at `service-task.time` local time (04:00 by default)."""
+        """Daily at `service-task.time` local time (04:00 by default)."""
         try:
             hour, minute = conf.service_task_time()
         except ValueError as e:
@@ -55,7 +55,7 @@ class Scheduler:
         return at if at > now else at + timedelta(days=1)
 
     def reload(self, registry=None):
-        """SCH-6: replaces all timers with the current declarations."""
+        """Replaces all timers with the current declarations."""
         from feedxcavator.models import ScheduleState
 
         registry = registry or workspace.get_registry()
@@ -65,7 +65,7 @@ class Scheduler:
             if not schedule.enabled:
                 continue
             state, created = ScheduleState.objects.get_or_create(key=schedule.key, defaults={"first_seen_at": now})
-            if self._first and not created and schedule.misfire == "run-once":  # SCH2-3
+            if self._first and not created and schedule.misfire == "run-once":  # a missed firing runs once
                 since = state.last_fired_at or state.first_seen_at
                 if schedule.next_fire(since) <= now:
                     misfired.append(schedule)
@@ -123,7 +123,7 @@ class Worker:
         kind, payload = item.kind, item.payload or {}
         if kind == "task":
             self.runner.enqueue(payload["name"], payload.get("trigger") or "manual")
-        elif kind == "reschedule":  # SCH-7
+        elif kind == "reschedule":
             workspace.load(force=True)
             self.scheduler.reload()
         elif kind == "service-task":
@@ -150,7 +150,7 @@ class Worker:
         applog.install_excepthooks()
         applog.install_stdout()
         telegram.in_worker = True
-        # TSK-11: tasks do not survive a restart
+        # tasks do not survive a restart
         QueueItem.objects.all().delete()
         TaskRun.objects.filter(status="running").update(status="failed", error="interrupted by a restart",
                                                         finished_at=timezone.now())
@@ -188,11 +188,11 @@ class Worker:
         if self.rpc is not None:
             self.rpc.close()
         self.runner.shutdown()
-        lifecycle.stop_child_processes()  # BRW-6
+        lifecycle.stop_child_processes()  # browsers included
 
 
 def start_repl(port: int):
-    """CFG2-2: a local Python REPL attached to the worker's live namespace, bound to 127.0.0.1.
+    """A local Python REPL attached to the worker's live namespace, bound to 127.0.0.1.
     A line starting with `(` is evaluated as Hy."""
 
     def serve(client: socket.socket):

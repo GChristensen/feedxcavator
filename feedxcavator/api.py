@@ -1,4 +1,4 @@
-"""The console API: JSON over HTTP under /front/api/ (API2-1)."""
+"""The console API: JSON over HTTP under /front/api/."""
 
 from __future__ import annotations
 
@@ -37,7 +37,7 @@ def _api_error(request, exc: ApiError):
 
 
 def blocking(fn):
-    """Runs an endpoint in a thread of its own, so long operations do not block other requests (PRC-5)."""
+    """Runs an endpoint in a thread of its own, so long operations do not block other requests."""
 
     def call(*args, **kwargs):
         from django.db import connections
@@ -106,7 +106,7 @@ def reload() -> dict:
 def _tree(directory: Path, feeds: dict) -> list[dict]:
     nodes = []
     try:
-        # a group library (WS2-9) is listed first in its folder; the top-level lib/ keeps its place
+        # a group library is listed first in its folder; the top-level lib/ keeps its place
         nested = directory != root()
         entries = sorted(directory.iterdir(),
                          key=lambda p: (not (nested and p.name == "lib" and p.is_dir()), p.is_file(), p.name.lower()))
@@ -171,7 +171,7 @@ class MoveIn(Schema):
 
 
 def diagnostics_for(path: str, content: str) -> list[dict]:
-    """UI2-5: validation of the YAML files against their schemas."""
+    """Validates the YAML files of the workspace against their schemas."""
     name = Path(path).name
     try:
         if name == "feed.yaml" and path.startswith("feeds/"):
@@ -204,7 +204,7 @@ def read_file(request, path: str):
 @api.put("/file")
 @blocking
 def write_file(request, data: FileIn):
-    """WS2-5, WS2-6, UI2-10, UI2-11: an atomic write followed by a reload whose result is returned."""
+    """An atomic write followed by a reload whose result is returned."""
     target = resolve(data.path)
     path = rel(target)
     if target.is_dir():
@@ -213,7 +213,7 @@ def write_file(request, data: FileIn):
         if abs(target.stat().st_mtime - data.base_mtime) > 0.0005:
             raise ApiError(409, "the file was changed on disk", mtime=target.stat().st_mtime)
     problems = diagnostics_for(path, data.content)
-    if problems:  # FD2-4: nothing is stored
+    if problems:  # an invalid feed.yaml is not stored
         raise ApiError(400, "validation failed", diagnostics=problems)
     change = _suffix_change(target, data.content)
     if change is not None:
@@ -288,7 +288,7 @@ def create_file(request, data: CreateIn):
 @api.post("/file/move")
 @blocking
 def move_file(request, data: MoveIn):
-    """Renames or moves a file or a directory. A feed keeps its identity (WS2-7): the id is in feed.yaml."""
+    """Renames or moves a file or a directory. A feed keeps its identity: the id is in feed.yaml."""
     source, target = resolve(data.src, must_exist=True), resolve(data.dst)
     if target.exists():
         raise ApiError(409, f"{rel(target)} already exists")
@@ -315,7 +315,7 @@ def delete_file(request, path: str):
         shutil.rmtree(target)
     else:
         target.unlink()
-    for info in removed:  # WS-9
+    for info in removed:  # a deleted feed loses its subscriptions
         if info.key:
             websub.delete_feed_subscriptions(info.key)
             storage.delete_feed_output(info.key)
@@ -346,7 +346,7 @@ class RenameSuffixIn(Schema):
 @api.post("/feed/new")
 @blocking
 def new_feed(request, data: NewFeedIn):
-    """FD2-7: creates a feed directory from the template."""
+    """Creates a feed directory from the template."""
     base = resolve("feeds/" + data.dir.strip("/")) if data.dir.strip("/") else resolve("feeds")
     registry = workspace.get_registry()
     for info in registry.feeds.values():  # feeds do not nest
@@ -414,7 +414,7 @@ def _feed_from_text(path: str, text: str):
     info = registry.feeds.get(feed_path)
     if not feed.get("extractor") and info is not None:
         own = [r for r in registry.extractors.values() if r.file.startswith(info.dir + "/")]
-        if len(own) == 1:  # UC2-14
+        if len(own) == 1:  # the only extractor in the feed directory is the feed's extractor
             feed = feed.replace(extractor=own[0].name)
     return feed
 
@@ -422,7 +422,7 @@ def _feed_from_text(path: str, text: str):
 @api.post("/feed/test")
 @blocking
 def test_feed(request, data: FeedTextIn):
-    """API-6: runs the unsaved definition in test mode. Nothing is stored or published."""
+    """Runs the unsaved definition in test mode. Nothing is stored or published."""
     feed = _feed_from_text(data.path, data.yaml)
     with context.scope(source=extraction.extractor_name(feed)):
         result = extraction.run_feed(feed, "test")
@@ -440,7 +440,7 @@ def test_feed(request, data: FeedTextIn):
 @api.post("/feed/suggest")
 @blocking
 def suggest_selectors(request, data: FeedTextIn):
-    """AUTO-2: proposes a `selectors` block for the current source. Nothing is saved."""
+    """Proposes a `selectors` block for the current source. Nothing is saved."""
     feed = _feed_from_text(data.path, data.yaml)
     if not feed.source_url:
         raise ApiError(400, "the feed has no source")
@@ -466,7 +466,7 @@ def feed_url(request, key: str):
 @api.post("/feed/run-tasks")
 @blocking
 def run_feed_tasks(request, data: FeedKeyIn):
-    """API-8: enqueues the tasks the feed belongs to."""
+    """Enqueues the tasks the feed belongs to."""
     from feedxcavator import worker
 
     feed = workspace.get_registry().feed_by_key(data.key)
@@ -501,7 +501,7 @@ class ScratchIn(Schema):
 @api.post("/scratch/run")
 @blocking
 def run_scratch(request, data: ScratchIn):
-    """UC2-20."""
+    """Runs a scratch buffer in an isolated copy of the namespace and returns what it printed."""
     return workspace.run_scratch(data.content, data.path)
 
 
@@ -555,7 +555,7 @@ def list_tasks(request):
 @api.get("/tasks/feeds")
 @blocking
 def task_feeds(request, task: str):
-    """TSK-10."""
+    """The feeds a task runs."""
     return [{"key": f["key"], "title": f["title"], "suffix": f["suffix"]}
             for f in workspace.get_registry().task_feeds(task)]
 
@@ -609,7 +609,7 @@ def _as_text(value) -> str:
 @api.get("/tasks/table")
 @blocking
 def tasks_table(request):
-    """The Tasks tab: tasks.yaml as written, plus the tasks named only by feeds (TSK2-2)."""
+    """The Tasks tab: tasks.yaml as written, plus the tasks named only by feeds."""
     from feedxcavator.models import TaskRun
 
     registry = workspace.get_registry()
@@ -680,7 +680,7 @@ def _edit_tasks(mutate) -> dict:
 
 
 def _task_key(tasks, name: str):
-    """The key of a task in tasks.yaml: as spelled, or matching without case (TSK-1)."""
+    """The key of a task in tasks.yaml: as spelled, or matching without case."""
     if name in tasks:
         return name
     return next((k for k in tasks if str(k).lower() == name.lower()), None)
@@ -784,7 +784,7 @@ def _describe(cron: str) -> str:
 @api.get("/schedules")
 @blocking
 def list_schedules(request):
-    """UI2-8."""
+    """The Schedules tab: each schedule with its next firings and last run."""
     from feedxcavator.models import ScheduleState, TaskRun
 
     registry = workspace.get_registry()
@@ -888,7 +888,7 @@ def _run_dict(run, children_of) -> dict:
 @api.get("/runs")
 @blocking
 def runs(request, limit: int = 50, before: int | None = None):
-    """UI2-9."""
+    """The Runs tab: recent task runs, newest first."""
     from feedxcavator.models import TaskRun
 
     query = TaskRun.objects.filter(parent__isnull=True).order_by("-id")
@@ -1046,7 +1046,7 @@ def clear_log(request):
 @api.get("/server-log")
 @blocking
 def server_log(request):
-    """API-15."""
+    """The contents of log/app.log."""
     path = conf.LOG_DIR / "app.log"
     if not path.exists():
         return {"content": ""}
@@ -1057,7 +1057,7 @@ def server_log(request):
         return {"content": f.read().decode("utf-8", "replace")}
 
 
-# word filters (STO2-9, WF-1, WF-2) ---------------------------------------------------------------
+# word filters ---------------------------------------------------------------------------------
 
 
 class WordFilterIn(Schema):
@@ -1202,7 +1202,7 @@ def save_settings(request, data: SettingsIn):
 @api.post("/token")
 @blocking
 def generate_token(request):
-    """STO2-14: the token is shown once. Only its hash is stored."""
+    """Generates an API token. It is shown once. Only its hash is stored."""
     from feedxcavator.models import ApiToken
     from feedxcavator.views import token_hash
 
@@ -1245,7 +1245,7 @@ def purge_images(request):
 @api.post("/restart")
 @blocking
 def restart(request):
-    """LFC-2."""
+    """Restarts the server through the supervisor."""
     if not conf.supervised():
         raise ApiError(409, "Restart is available only when Feedxcavator is started by feedxcavator.cmd, "
                             "feedxcavator.sh or the systemd service")

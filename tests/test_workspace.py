@@ -17,13 +17,13 @@ def test_load_order_and_shared_namespace(ws):
     assert registry.errors == []
     ns = registry.namespace
     assert ns["ORDER"] == ["a", "b"]  # lib is alphabetical by path
-    assert ns["greet"]("x") == "X"  # a Hy function calls a Python one defined later (UC2-1)
+    assert ns["greet"]("x") == "X"  # a Hy function calls a Python one defined later
     assert registry.find_extractor("one-x").fn(None) == [{"title": "HI"}]
-    assert registry.feeds["one"].feed.extractor == "one-x"  # UC2-14
+    assert registry.feeds["one"].feed.extractor == "one-x"  # the only extractor in the directory
     assert "ping" in registry.handlers
 
     registry = ws({"lib/_order.yaml": "- b_util.py\n- a_first.hy\n"})
-    assert registry.namespace["ORDER"] == ["b", "a"]  # UC2-3: the explicit order
+    assert registry.namespace["ORDER"] == ["b", "a"]  # the explicit order
 
 
 def test_feed_code_failure_disables_only_that_feed(ws):
@@ -37,10 +37,10 @@ def test_feed_code_failure_disables_only_that_feed(ws):
     }, startup=True)
     bad, good = registry.feeds["bad"], registry.feeds["good"]
     assert good.status == "ok" and bad.status == "error" and bad.feed is None
-    assert "LEAK" not in registry.namespace and registry.namespace["GOOD"] == 1  # UC2-9
+    assert "LEAK" not in registry.namespace and registry.namespace["GOOD"] == 1  # a failed unit leaks no names
     assert registry.find_extractor("bad-x") is None and registry.find_extractor("good-x") is not None
     error = registry.errors_for("feeds/bad/b.hy")[0]
-    assert error.line == 3 and "undefined_thing" in error.message  # UC2-11
+    assert error.line == 3 and "undefined_thing" in error.message  # the traceback points into the workspace
     assert 'File "feeds/bad/b.hy", line 3' in error.traceback
     assert [f["suffix"] for f in registry.active_feeds()] == ["good"]
     assert LogEntry.objects.filter(level="error", source="workspace").count() == 1
@@ -52,7 +52,7 @@ def test_broken_lib_keeps_previous_state(ws):
     live = workspace.get_registry()
     attempt = ws({"lib/util.py": "VALUE = 2\nraise RuntimeError('boom')\n",
                   "feeds/g/feed.yaml": FEED.format(title="g")})
-    assert attempt.abandoned and workspace.get_registry() is live  # UC2-7
+    assert attempt.abandoned and workspace.get_registry() is live  # the previous registry stays
     assert live.namespace["VALUE"] == 1 and "g" not in live.feeds
     assert any(e.path == "lib/util.py" and e.line == 2 for e in live.errors)
     fixed = ws({"lib/util.py": "VALUE = 3\n"})
@@ -64,7 +64,7 @@ def test_swap_does_not_touch_running_state(ws):
     old = ws({"lib/util.py": "def version():\n    return 1\n"}, startup=True)
     running = old.namespace["version"]
     new = ws({"lib/util.py": "def version():\n    return 2\n"})
-    assert running() == 1 and new.namespace["version"]() == 2  # UC2-5
+    assert running() == 1 and new.namespace["version"]() == 2  # a running job keeps its namespace
     assert new.generation == old.generation + 1
 
 
@@ -84,7 +84,7 @@ def test_identity_and_duplicates(ws):
     b = registry.feeds["b"]
     assert b.status == "ok" and b.id == "1" * 32 and b.key == "1" * 32 and b.suffix == "same"
     assert "duplicate id" in registry.feeds["c"].error  # the later feed is disabled
-    assert "duplicate suffix" in registry.feeds["d"].error  # FD2-3, case-insensitively: stores are files
+    assert "duplicate suffix" in registry.feeds["d"].error  # case-insensitively: stores are files
     assert "cannot be used as the suffix" in registry.feeds["новости"].error  # ASCII only
     assert registry.feeds["новости-ok"].status == "ok" and registry.feeds["новости-ok"].key == "news"
     assert registry.feed_by_key("a") is a.feed and registry.feed_by_id("a") is None
@@ -106,7 +106,7 @@ def test_duplicate_registration_names_both_files(ws):
         "feeds/b/feed.yaml": FEED.format(title="b"),
         "feeds/b/x.py": "@extractor('same')\ndef b(feed):\n    return []\n",
     }, startup=True)
-    assert registry.feeds["a"].status == "ok" and registry.feeds["b"].status == "error"  # UC2-13
+    assert registry.feeds["a"].status == "ok" and registry.feeds["b"].status == "error"  # a duplicate registration
     message = registry.feeds["b"].error
     assert "feeds/a/x.py" in message and "feeds/b/x.py" in message
 
@@ -115,7 +115,7 @@ def test_failed_handler_file(ws):
     ws({"handlers/h.py": "@handler('one')\ndef one(request):\n    return 'x'\n"}, startup=True)
     registry = ws({"handlers/h.py": "@handler('one')\ndef one(request):\n    return 'x'\n1/0\n",
                    "handlers/ok.py": "@handler('two')\ndef two(request):\n    return 'y'\n"})
-    assert "one" not in registry.handlers and registry.failed_handlers == {"one": "handlers/h.py"}  # UC2-10
+    assert "one" not in registry.handlers and registry.failed_handlers == {"one": "handlers/h.py"}
     assert "two" in registry.handlers
 
 
@@ -165,9 +165,9 @@ def test_hy_dsl(ws):
     assert headlines[0]["title"] == "T" and headlines[0]["link"] == "https://e.test/x"
     result = registry.namespace["probe"]()
     assert result["all"] == 1 and result["first"] == "A b" and result["threaded"] == "A b" and result["enlive"] == 1
-    assert result["kw"] == ["T", "png", None]  # HY-3
+    assert result["kw"] == ["T", "png", None]  # keywords as accessors
     assert result["cond"] == 6 and result["some"] is None
-    assert result["assoc"]["title"] == "U" and result["original"]["title"] == "T"  # HY-2: no mutation
+    assert result["assoc"]["title"] == "U" and result["original"]["title"] == "T"  # no mutation
     assert result["update"] == {"n": 6} and result["get-in"] == 20
     assert result["assoc-in"] == {"a": {"b": 1, "c": 2}} and result["merge"] == {"a": 3, "b": 2}
     assert result["select"] == {"b": 2} and result["distinct"] == [{"k": 1}, {"k": 2}]
@@ -202,7 +202,7 @@ def test_load_js_reads_next_to_the_calling_file(ws):
 
 def test_hy_selector_literal_is_checked_at_load(ws):
     registry = ws({"lib/bad.hy": '(defn f [page]\n  ($ page "div["))\n'}, startup=True)
-    assert registry.errors and "div[" in registry.errors[0].message  # SEL-11
+    assert registry.errors and "div[" in registry.errors[0].message  # checked at expansion time
 
 
 def test_tasks_and_schedules_are_resolved(ws):
@@ -219,9 +219,9 @@ def test_tasks_and_schedules_are_resolved(ws):
     suffixes = lambda name: sorted(f["suffix"] for f in registry.task_feeds(name))  # noqa: E731
     assert suffixes("news") == ["paper"]  # disabled feeds are excluded
     assert suffixes("local") == ["paper"] and suffixes("byname") == ["world"]
-    assert suffixes("extra") == ["world"]  # TSK-1: case-insensitive, no declaration needed
-    assert suffixes("morning") == ["paper", "world"] and suffixes("nested") == ["paper", "world"]  # TSK2-3
-    assert suffixes("nobody") == []  # TSK-2
+    assert suffixes("extra") == ["world"]  # case-insensitive, no declaration needed
+    assert suffixes("morning") == ["paper", "world"] and suffixes("nested") == ["paper", "world"]
+    assert suffixes("nobody") == []
     assert registry.task_names() == ["broken", "byname", "Extra", "local", "morning", "nested", "news"]
     assert "nope" in registry.task("broken").error
     assert registry.schedules[0].task == "morning"
@@ -233,7 +233,7 @@ def test_scratch_is_isolated(ws):
 
     applog.install_stdout()
     result = workspace.run_scratch('(print (shout "hi"))\n(setv shout 5)\n(defextractor leak [feed] [])\n', "scratch.hy")
-    assert result["output"] == "HI\n" and result["error"] is None  # UC2-20
+    assert result["output"] == "HI\n" and result["error"] is None
     assert callable(workspace.get_registry().namespace["shout"])
     assert workspace.get_registry().find_extractor("leak") is None
     failed = workspace.run_scratch("print('before')\n1/0\n", "scratch.py")
@@ -271,7 +271,7 @@ def test_group_libraries(ws):
     city = registry.feeds["news/local/city"].feed
     assert registry.find_extractor("city-x").fn(city) == [{"title": "local news: C!"}]
     assert registry.find_extractor("news-x") is not None  # registrations are global
-    # group names stay in the group, the feed's own names are shared as before (UC2-9)
+    # group names stay in the group, the feed's own names are shared as before
     ns = registry.namespace
     assert "news_title" not in ns and "local_title" not in ns and "deeper" not in ns and ns["CITY"] == 1
     assert ns["HAS_NEWS"] is False

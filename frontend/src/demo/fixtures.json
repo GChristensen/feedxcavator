@@ -598,7 +598,7 @@
       "name": "parse_page_range",
       "hy": "parse-page-range",
       "signature": "(feed, path, start, end, include_source=True, increment=1, parser=None, delay=None, useragent=None, source=None)",
-      "doc": "Reads several pages and concatenates their headlines (FD-16, FD-17). `path` is a template\nappended to the source, with `{n}` (or `%n`) replaced by the page number, or a function of it."
+      "doc": "Reads several pages and concatenates their headlines. `path` is a template\nappended to the source, with `{n}` (or `%n`) replaced by the page number, or a function of it."
      },
      {
       "name": "fetch_document",
@@ -657,7 +657,7 @@
       "name": "filter_headlines",
       "hy": "filter-headlines",
       "signature": "(feed, headlines, testing=None)",
-      "doc": "Runs the `filter` steps of a feed in order. A console test skips the history steps (FD-20)."
+      "doc": "Runs the `filter` steps of a feed in order. A console test skips the history steps."
      },
      {
       "name": "add_filter_word",
@@ -687,7 +687,7 @@
       "name": "list_word_filter",
       "hy": "list-word-filter",
       "signature": "(name='default') -> 'list[str]'",
-      "doc": "Entries of a word filter. Regular expressions are returned as their source text (WF-2)."
+      "doc": "Entries of a word filter. Regular expressions are returned as their source text."
      }
     ]
    },
@@ -698,7 +698,7 @@
       "name": "fix_relative_url",
       "hy": "fix-relative-url",
       "signature": "(url, base)",
-      "doc": "Makes a link absolute against the source URL (FD-13). Protocol-relative URLs take the scheme of\nthe source (SEL-6)."
+      "doc": "Makes a link absolute against the source URL. Protocol-relative URLs take the scheme of\nthe source."
      },
      {
       "name": "redirect_url",
@@ -1136,7 +1136,7 @@
       "name": "page.apply_selectors(feed=None)",
       "hy": "(.apply-selectors page ...)",
       "signature": "",
-      "doc": "Applies the feed selectors to the live DOM. Parts are text content where the built-in\nextractor gives inner HTML (INT-1)."
+      "doc": "Applies the feed selectors to the live DOM. Parts are text content where the built-in\nextractor gives inner HTML."
      },
      {
       "name": "page.goto(url, wait_for=None, timeout=30)",
@@ -1196,7 +1196,7 @@
       "name": "page.solve_captcha(timeout=60, attempts=2, watch=0) -> bool",
       "hy": "(.solve-captcha page ...)",
       "signature": "",
-      "doc": "BRW-8: passes a Cloudflare challenge on the page with the system mouse, if there is one. True when\nthe page is through. `watch` is how many seconds to keep looking for a challenge that has not shown yet\n(it returns as soon as one does). Needs a headful browser, pyautogui and the display the browser is on."
+      "doc": "Passes a Cloudflare challenge on the page with the system mouse, if there is one. True when\nthe page is through. `watch` is how many seconds to keep looking for a challenge that has not shown yet\n(it returns as soon as one does). Needs a headful browser, pyautogui and the display the browser is on."
      },
      {
       "name": "page.text(selector=None)",

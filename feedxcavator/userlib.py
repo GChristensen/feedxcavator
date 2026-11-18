@@ -1,4 +1,4 @@
-"""The user library: everything the prelude puts into the namespace of user code (UC2-2, UC2-21, HY-2).
+"""The user library: everything the prelude puts into the namespace of user code.
 
 The API tab of the console is generated from the docstrings of this module (`api_reference`).
 """
@@ -269,7 +269,7 @@ def store_image(data, content_type="image/jpeg", source_url=""):
     return f"{get_app_host()}/image/{blob.id}"
 
 
-# Clojure-style helpers over plain dicts and sequences (HY-2). None of them mutates its arguments. ----
+# Clojure-style helpers over plain dicts and sequences. None of them mutates its arguments. ----
 
 
 def _k(key):
@@ -614,7 +614,7 @@ def _namespace() -> dict:
 
 
 def _patch_keyword():
-    """HY-3: `(:title h)` works on headline dicts and returns None for a missing key."""
+    """`(:title h)` works on headline dicts and returns None for a missing key."""
     from hy.models import Keyword
     from hy.reader import mangle
 
@@ -637,7 +637,7 @@ def _patch_keyword():
 
 
 def install(module):
-    """Evaluates the prelude into the namespace of a user module (UC2-2)."""
+    """Evaluates the prelude into the namespace of a user module."""
     import hy  # noqa: F401 - installs the Hy import hook
     from hy.reader import mangle
 
@@ -663,7 +663,7 @@ def _signature(fn) -> str:
 
 
 def api_reference() -> list[dict]:
-    """UI-19, UC2-21: the reference shown on the API tab, generated from the docstrings."""
+    """The reference shown on the API tab, generated from the docstrings."""
     hy_names = {id(fn): name for name, fn in HY_ALIASES.items()}
     sections = []
     for category, functions in CATEGORIES:

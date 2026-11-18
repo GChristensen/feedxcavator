@@ -1,4 +1,4 @@
-"""The maintenance task (MNT-1, STO2-16)."""
+"""The maintenance task."""
 
 from __future__ import annotations
 

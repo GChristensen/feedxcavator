@@ -1,4 +1,4 @@
-"""Public and utility routes (API2-2). Blocking work runs in threads so the event loop stays free (PRC-5)."""
+"""Public and utility routes. Blocking work runs in threads so the event loop stays free."""
 
 from __future__ import annotations
 
@@ -57,7 +57,7 @@ def token_hash(token: str) -> str:
 
 
 def authorized(request) -> bool:
-    """AUTH-6: the x-feedxcavator-auth header must carry the API token."""
+    """The x-feedxcavator-auth header must carry the API token."""
     from feedxcavator.models import ApiToken
 
     token = request.headers.get("x-feedxcavator-auth")
@@ -73,7 +73,7 @@ def _safe_next(target: str | None) -> str:
 
 @threaded
 def login(request):
-    """AUTH-2."""
+    """The login page and form."""
     if not auth_enabled():
         return HttpResponseRedirect("/console")
     next_url = _safe_next(request.GET.get("next") or request.POST.get("next"))
@@ -115,7 +115,7 @@ def console(request):
 
 
 def parse_byte_range(header: str | None, length: int):
-    """IMG-2: a single range as (start, end) inclusive, "unsatisfiable", or None for the whole file."""
+    """A single range as (start, end) inclusive, "unsatisfiable", or None for the whole file."""
     m = re.fullmatch(r"bytes=(\d*)-(\d*)", (header or "").strip())
     if not m:
         return None
@@ -145,7 +145,7 @@ async def _file_chunks(path: Path, start: int, length: int):
 
 
 def file_response(request, path: Path, content_type: str | None, cache_control: str):
-    """Streams a file from disk with range, ETag and If-Range support (IMG-2)."""
+    """Streams a file from disk with range, ETag and If-Range support."""
     stat = path.stat()
     length = stat.st_size
     etag = f'"{int(stat.st_mtime * 1000):x}-{length:x}"'
@@ -179,7 +179,7 @@ def file_response(request, path: Path, content_type: str | None, cache_control: 
 
 @csrf_exempt
 async def image(request, blob_id):
-    """API-27, API2-4."""
+    """Serves a stored image, through nginx when x-accel is configured."""
     blob = await sync_to_async(_find_blob, thread_sensitive=False)(blob_id)
     if blob is None:
         return reply.page_not_found()
@@ -221,7 +221,7 @@ async def favicon(request):
 @csrf_exempt
 @threaded
 def save_image(request):
-    """API-28 with AUTH2-4: stores the raw body as an image and returns its id."""
+    """Stores the raw body as an image and returns its id."""
     if request.method != "POST":
         return HttpResponse(status=405)
     if not authorized(request):
@@ -241,7 +241,7 @@ def _stored(info):
 @csrf_exempt
 @threaded
 def feed(request, suffix):
-    """EX-11, UC2-8, and the resolution of section 17.2: a feed with tasks is served from storage."""
+    """Serves a feed. A feed with tasks is served from storage, a failed feed answers 503."""
     registry = workspace.get_registry()
     info = registry.info_by_id(suffix[5:]) if suffix.startswith("uuid:") else registry.info_by_suffix(suffix)
     if info is None or (info.status == "ok" and not info.enabled):
@@ -295,7 +295,7 @@ def _as_response(value):
 @csrf_exempt
 @threaded
 def handler(request, name):
-    """HND-1 to HND-5, UC2-10."""
+    """Runs a handler. A handler whose file failed to load answers 503."""
     registry = workspace.get_registry()
     registration = registry.handlers.get(name)
     if registration is None:
@@ -317,7 +317,7 @@ def handler(request, name):
 
 
 def _raw_tail(request, prefix_parts: int) -> str:
-    """The rest of the raw path after `prefix_parts` segments, still percent-encoded (CFG-6)."""
+    """The rest of the raw path after `prefix_parts` segments, still percent-encoded, so encoded slashes survive."""
     raw = request.scope.get("raw_path") if hasattr(request, "scope") else None
     path = raw.decode("latin-1") if raw else request.get_full_path().split("?")[0]
     return path.lstrip("/").split("/", prefix_parts)[-1]
@@ -338,7 +338,7 @@ def _redirect_target(target):
 
 @csrf_exempt
 async def redirect(request, random, url):
-    """API-30."""
+    """Redirects to the URL in the rest of the path."""
     target = unquote(_raw_tail(request, 2))
     query = request.META.get("QUERY_STRING")
     if query and "?" not in target:  # an unencoded target: the server split its query off
@@ -349,7 +349,7 @@ async def redirect(request, random, url):
 
 @csrf_exempt
 async def redirect_b64(request, random, data):
-    """API-31."""
+    """Redirects to a URL given in URL-safe Base64."""
     try:
         target = base64.urlsafe_b64decode(data + "=" * (-len(data) % 4)).decode("utf-8")
     except (ValueError, UnicodeDecodeError):
@@ -382,7 +382,7 @@ def _forward(request, url, referer, proxy):
 @csrf_exempt
 @threaded
 def forward(request, random=None):
-    """API-32."""
+    """Fetches `url` and forwards the response, with an optional referer."""
     url = request.GET.get("url")
     if not url:
         return reply.page_not_found()
@@ -392,7 +392,7 @@ def forward(request, random=None):
 @csrf_exempt
 @threaded
 def forward_b64(request, data):
-    """API-33: `data` is URL-safe Base64 of `<url>;;<referer>`."""
+    """Forwards like `forward`. `data` is URL-safe Base64 of `<url>;;<referer>`."""
     try:
         decoded = base64.urlsafe_b64decode(data + "=" * (-len(data) % 4)).decode("utf-8")
     except (ValueError, UnicodeDecodeError):
@@ -407,7 +407,7 @@ def forward_b64(request, data):
 @csrf_exempt
 @threaded
 def websub_hub(request):
-    """API-34. GET answers 405 (fixes section 17.8)."""
+    """The WebSub hub. GET answers 405."""
     if request.method != "POST":
         return HttpResponse(status=405, headers={"Allow": "POST"})
     return HttpResponse(status=websub.hub_action(request.POST.dict()))
@@ -415,7 +415,7 @@ def websub_hub(request):
 
 @threaded
 def run_task(request, task):
-    """TSK-8."""
+    """Enqueues a task."""
     from feedxcavator import worker
 
     try:
@@ -427,7 +427,7 @@ def run_task(request, task):
 
 @threaded
 def reschedule(request):
-    """SCH-7: triggers a reload of schedules.yaml."""
+    """Triggers a reload of schedules.yaml."""
     from feedxcavator import worker
 
     workspace.load(force=True)
@@ -437,7 +437,7 @@ def reschedule(request):
 
 @threaded
 def service_task(request):
-    """API-37."""
+    """Starts the maintenance task in the background."""
     from feedxcavator import worker
 
     worker.enqueue("service-task")
@@ -455,7 +455,7 @@ def _json_body(request) -> dict:
 @csrf_exempt
 @threaded
 def wordfilter(request, action):
-    """API-40 to API-43."""
+    """Reads and edits word filters."""
     if request.method != "POST":
         return HttpResponse(status=405)
     if not authorized(request):
@@ -484,7 +484,7 @@ def wordfilter(request, action):
 
 
 def not_found(request, exception=None):
-    """API-38. Django calls error handlers synchronously."""
+    """Any other path: 404 with a short HTML body. Django calls error handlers synchronously."""
     return reply.page_not_found()
 
 

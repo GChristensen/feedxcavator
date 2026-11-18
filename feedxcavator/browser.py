@@ -1,7 +1,7 @@
-"""Browser automation (BRW-1 to BRW-7).
+"""Browser automation.
 
 User code sees one interface: `with browser(profile) as b: page = b.open(url)`. Browsers live in a pool
-owned by the worker. In the web process the same interface talks to the worker over RPC (PRC-4).
+owned by the worker. In the web process the same interface talks to the worker over RPC.
 The engine is any Playwright-compatible one: camoufox (default), patchright or playwright.
 """
 
@@ -43,7 +43,7 @@ def _headless() -> bool:
     if setting is not None:
         return bool(setting)
     if os.name == "posix" and not _is_macos():
-        return not os.environ.get("DISPLAY")  # BRW-4: headful when a (virtual) display exists
+        return not os.environ.get("DISPLAY")  # headful when a (virtual) display exists
     return True
 
 
@@ -57,7 +57,7 @@ _xvfb = None
 
 
 def ensure_display():
-    """BRW-4: on Linux without a display, use `browser-display` (an X display the worker may use, such as the
+    """On Linux without a display, use `browser-display` (an X display the worker may use, such as the
     desktop's ":0" opened with `xhost +`), otherwise start Xvfb when it is installed, so the browser runs headful."""
     global _xvfb
     if os.name != "posix" or _is_macos() or os.environ.get("DISPLAY") or conf.get("browser-headless") is True:
@@ -325,7 +325,7 @@ def playwright_proxy(proxy: dict) -> dict:
 
 
 class BrowserPool:
-    """BRW-3: at most `browser-pool-size` browsers. A job waits for a free one."""
+    """At most `browser-pool-size` browsers. A job waits for a free one."""
 
     def __init__(self, size: int | None = None):
         self.size = max(1, int(size or conf.get("browser-pool-size", 1)))
@@ -408,7 +408,7 @@ class Page:
 
     def apply_selectors(self, feed=None):
         """Applies the feed selectors to the live DOM. Parts are text content where the built-in
-        extractor gives inner HTML (INT-1)."""
+        extractor gives inner HTML."""
         feed = feed if feed is not None else context.current_feed.get()
         return sel.apply_selectors(self.html(), feed, base_url=self.url, text_mode=True)
 
@@ -463,7 +463,7 @@ class Page:
         return self._call("screenshot", selector, type, quality, style, timeout)
 
     def solve_captcha(self, timeout=60, attempts=2, watch=0) -> bool:
-        """BRW-8: passes a Cloudflare challenge on the page with the system mouse, if there is one. True when
+        """Passes a Cloudflare challenge on the page with the system mouse, if there is one. True when
         the page is through. `watch` is how many seconds to keep looking for a challenge that has not shown yet
         (it returns as soon as one does). Needs a headful browser, pyautogui and the display the browser is on."""
         solved = self._call("solve_captcha", timeout, attempts, watch)
@@ -509,7 +509,7 @@ class Browser:
         return self._call("user_agent")
 
     def _hand_over(self, url):
-        """BRW-5: later fetch_url calls for the host reuse the cookies and user agent."""
+        """Later fetch_url calls for the host reuse the cookies and user agent."""
         try:
             host_url = "{0.scheme}://{0.netloc}/".format(urlsplit(url))
             engine = str(conf.get("browser-engine", "camoufox")).lower()

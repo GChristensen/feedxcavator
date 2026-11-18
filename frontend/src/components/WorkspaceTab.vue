@@ -1,5 +1,5 @@
 <script setup>
-// The Workspace tab (UI2-6 to UI2-7b, UI2-10, UI2-11): one tree for all files next to an editor
+// The Workspace tab: one tree for all files next to an editor
 // with one tab per open file.
 import { computed, inject, markRaw, onMounted, onUnmounted, provide, reactive, ref } from 'vue'
 import { api, ApiError, describeError, formatLoad } from '../api'
@@ -54,7 +54,7 @@ const tree = reactive({
 provide('tree', tree)
 
 function persist() {
-  // UI-5: the tree state persists in local storage
+  // the tree state persists in local storage
   localStorage.setItem(STORAGE_KEY, JSON.stringify({
     expanded: [...tree.expanded], selected: tree.selected, open: files.map((f) => f.path), active: active.value,
   }))
@@ -130,7 +130,7 @@ function refreshOutline() {
   }
   const items = outlineOf(file.path, file.session.getValue())
   if (file.path === 'tasks.yaml') {
-    // UI-14: also the task names taken from the feeds
+    // also the task names taken from the feeds
     const declared = new Set(items.map((i) => i.name.toLowerCase()))
     for (const task of store.tasks) {
       if (!declared.has(task.name.toLowerCase())) items.push({ kind: 'task', name: task.name, task: task.name, line: null })
@@ -143,10 +143,10 @@ function watchSession(file) {
   file.session.on('change', () => {
     file.dirty = file.session.getValue() !== file.clean
     clearTimeout(outlineTimer)
-    outlineTimer = setTimeout(refreshOutline, 3000) // UI-13
+    outlineTimer = setTimeout(refreshOutline, 3000) // the outline follows the text
     if (file.lang === 'yaml') {
       clearTimeout(validateTimer)
-      validateTimer = setTimeout(() => validate(file), 900) // UI2-5: while typing
+      validateTimer = setTimeout(() => validate(file), 900) // while typing
     }
   })
 }
@@ -182,7 +182,7 @@ function activate(path) {
   annotate()
   const file = current.value
   const errors = ((store.load && store.load.errors) || []).filter((e) => file && e.path === file.path)
-  if (errors.length) setOutput(formatLoad({ ok: false, errors })) // UI2-7a
+  if (errors.length) setOutput(formatLoad({ ok: false, errors })) // the load errors of this file
 }
 
 function tabLabel(file) {
@@ -192,7 +192,7 @@ function tabLabel(file) {
 }
 
 function close(file) {
-  if (file.dirty && !confirm(`Discard unsaved changes in ${file.path}?`)) return // UI-7
+  if (file.dirty && !confirm(`Discard unsaved changes in ${file.path}?`)) return
   const index = files.indexOf(file)
   files.splice(index, 1)
   if (active.value === file.path) {
@@ -244,7 +244,7 @@ async function save(force = false) {
       ? `Suffix changed from '${result.renamed.from}' to '${result.renamed.to}'`
         + (result.renamed.moved ? ', the stored state was moved.' : '.')
       : ''
-    // UI2-11: the result of the reload the save triggered
+    // the result of the reload the save triggered
     if (result.load.ok) {
       setOutput(renamed)
       flash(renamed ? 'Saved. ' + renamed : 'Successfully saved.')
@@ -257,7 +257,7 @@ async function save(force = false) {
     }
   } catch (error) {
     if (error instanceof ApiError && error.status === 409 && error.body.mtime !== undefined) {
-      // UI2-10: the file changed on disk while it was open
+      // the file changed on disk while it was open
       busy.value = false
       if (confirm(`${file.path} was changed on disk since it was opened.\nOverwrite it with the editor contents?`)) {
         return save(true)
@@ -285,7 +285,7 @@ async function reloadFromDisk() {
   file.dirty = false
 }
 
-// feed actions (UI-8, UI2-7) ----------------------------------------------------------------------
+// feed actions ----------------------------------------------------------------------------------
 
 async function test() {
   const file = current.value
@@ -302,7 +302,7 @@ async function suggest() {
   if (!file) return
   const result = await run(() => api.post('/feed/suggest', { path: file.path, yaml: file.session.getValue() }))
   if (!result) return
-  // AUTO-2: the proposed block is inserted into the editor; nothing is saved until the user saves
+  // the proposed block is inserted into the editor; nothing is saved until the user saves
   const lines = file.session.getValue().split('\n')
   const start = lines.findIndex((l) => /^selectors:/.test(l))
   const block = result.yaml.replace(/\n$/, '').split('\n')
@@ -343,7 +343,7 @@ async function openFeedUrl(feed) {
 async function subscribe(feed) {
   const url = await feedUrl(feed)
   if (!url) return
-  const base = store.settings.subscription_url || 'http://newssharp/?url=' // UI-8
+  const base = store.settings.subscription_url || 'http://newssharp/?url=' // the default subscription URL
   window.open(base + encodeURIComponent(url), '_blank', 'noopener')
 }
 
@@ -352,7 +352,7 @@ async function runFeedTasks(feed) {
   if (result) flash(result.enqueued.length ? `Enqueued: ${result.enqueued.join(', ')}` : 'The feed has no tasks.', 4000)
 }
 
-// tree actions (UI2-6) -----------------------------------------------------------------------------
+// tree actions -----------------------------------------------------------------------------
 
 function parentOf(path) {
   return path.includes('/') ? path.slice(0, path.lastIndexOf('/')) : ''
@@ -374,7 +374,7 @@ async function newFeed(node) {
     path = parentOf(path)
   }
   await afterLoad(result.load)
-  await open(result.path) // UI-6
+  await open(result.path) // a new file opens in the editor
 }
 
 async function create(node, kind) {
@@ -456,7 +456,7 @@ function showMenu(event, node) {
   const entries = []
   const inFeeds = node.path === 'feeds' || node.path.startsWith('feeds/')
   if (node.type === 'feed') {
-    // UI2-7
+    // the context menu of a feed
     const ok = node.feed.status === 'ok'
     entries.push(
       { label: 'New code file', action: () => create(node, 'file') },
@@ -500,7 +500,7 @@ function rootMenu(event) {
 
 function outlineMenu(event, item) {
   if (item.kind !== 'task' || !item.task) return
-  // UI-14: right-clicking a task offers Run and List feeds
+  // right-clicking a task offers Run and List feeds
   popup(event, [
     { label: 'Run', action: () => runTask(item.task) },
     { label: 'List feeds', action: () => listTaskFeeds(item.task) },
@@ -594,7 +594,7 @@ defineExpose({
           </div>
         </div>
         <div class="toolbar">
-          <!-- UI2-7a: the toolbar adapts to the active file -->
+          <!-- the toolbar adapts to the active file -->
           <button class="primary" :disabled="!current || busy" @click="save()">Save</button>
           <template v-if="isFeed">
             <button :disabled="busy" @click="test">Test</button>

@@ -1,4 +1,4 @@
-"""URL routing (API2-1, API2-2)."""
+"""URL routing."""
 
 from django.urls import path, re_path
 

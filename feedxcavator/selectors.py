@@ -1,4 +1,4 @@
-"""The selector engine (PORT-REQUIREMENTS section 8).
+"""The selector engine.
 
 A selector is CSS by default, XPath with the `xpath:` prefix, or JMESPath with the `jmes:` prefix (JSON
 documents). CSS selectors may end with `::text`, `::attr(name)`, or the 3.0.0 attribute list `::a||b`.
@@ -343,8 +343,8 @@ def _post(value, part: Part):
 
 
 def fix_relative_url(url, base):
-    """Makes a link absolute against the source URL (FD-13). Protocol-relative URLs take the scheme of
-    the source (SEL-6)."""
+    """Makes a link absolute against the source URL. Protocol-relative URLs take the scheme of
+    the source."""
     if url is None or not str(url).strip():
         return None
     url = str(url).strip()
@@ -401,7 +401,7 @@ def extract(node, base_url=None, text_mode=False, **parts) -> dict | None:
         if value is not None:
             headline[name] = value
     if _is_blank(headline):
-        return None  # FD-14
+        return None  # an item without title, link and summary is dropped
     if isinstance(node, Selector):
         headline["html"] = node
     return headline
@@ -456,7 +456,7 @@ class SelectorSet:
 
 
 def enlive_to_css(vector) -> str:
-    """Converts an Enlive-style vector of keywords to CSS (SEL-12): [:div.post :> :a] is `div.post > a`."""
+    """Converts an Enlive-style vector of keywords to CSS: [:div.post :> :a] is `div.post > a`."""
     tokens = []
     for item in vector:
         if isinstance(item, (list, tuple)):

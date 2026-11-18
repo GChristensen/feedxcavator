@@ -1,4 +1,4 @@
-"""Cloudflare challenges solved with the system mouse (BRW-8).
+"""Cloudflare challenges solved with the system mouse.
 
 Turnstile ignores clicks synthesized by the browser driver, so the pointer is moved and clicked by pyautogui
 on the display the browser window is on. The checkbox is not clicked at fixed screen coordinates: its position

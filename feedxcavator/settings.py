@@ -64,7 +64,7 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 AUTH_PASSWORD_VALIDATORS = []
 
 def _local_zone_name() -> str:
-    """SCH-2: the server's local zone. On Unix Django exports TIME_ZONE as TZ and calls tzset(), which would make
+    """The server's local zone. On Unix Django exports TIME_ZONE as TZ and calls tzset(), which would make
     the process (and the web and worker processes it starts) believe the local zone is whatever is set here."""
     try:
         from tzlocal import get_localzone_name
@@ -78,7 +78,7 @@ USE_TZ = True
 TIME_ZONE = _local_zone_name()
 USE_I18N = False
 
-# AUTH2-2
+# sessions: HttpOnly, SameSite=Strict, and Secure over HTTPS
 SESSION_ENGINE = "django.contrib.sessions.backends.db"
 # Cookies ignore the port, so default names would clash with other Django apps on the same host.
 SESSION_COOKIE_NAME = "feedxcavator_sessionid"

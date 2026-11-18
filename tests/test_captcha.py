@@ -1,4 +1,4 @@
-"""BRW-8: the geometry of solve-captcha (the pointer and the browser are not exercised)."""
+"""The geometry of solve-captcha (the pointer and the browser are not exercised)."""
 
 from feedxcavator import captcha
 from feedxcavator.captcha import ScreenMap

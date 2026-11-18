@@ -1,4 +1,4 @@
-"""MIG-1 to MIG-3: imports a 3.0.0 backup.edn."""
+"""Imports a 3.0.0 backup.edn."""
 
 import json
 import re
@@ -59,7 +59,7 @@ def convert_definition(text: str, feed_id: str, params=None):
         tree["params"] = params
     for name, selector in (tree.get("selectors") or {}).items():
         if isinstance(selector, str) and (selector.lstrip()[:1] in ("[", "{") or selector.lstrip().startswith("#{")):
-            notes.append(f"native Enlive selector in '{name}': {selector}")  # MIG-2
+            notes.append(f"native Enlive selector in '{name}': {selector}")  # reported, not converted
     if tree.get("output") == "edn":
         notes.append("output: edn is no longer supported (use json)")
     pages = tree.get("pages")
@@ -82,7 +82,7 @@ def unquote(name: str) -> str:
 
 
 def convert_tasks_module(code: str):
-    """MIG-3: `schedule` declarations become schedules, `deftask*` declarations become tasks."""
+    """`schedule` declarations become schedules, `deftask*` declarations become tasks."""
     code = re.sub(r";[^\n]*", "", code)
     schedules = []
     for kind, task, hour, minute, day in SCHEDULE.findall(code):

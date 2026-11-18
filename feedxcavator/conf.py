@@ -1,4 +1,4 @@
-"""Configuration: `config.yml` in the home directory plus environment overrides (CFG-2, CFG-3, CFG2-*)."""
+"""Configuration: `config.yml` in the home directory plus environment overrides."""
 
 from __future__ import annotations
 
@@ -29,7 +29,7 @@ DEFAULTS = {
     "telegram": None,  # a mapping, see TELEGRAM_DEFAULTS
     "tg-api-id": None,  # 3.0.0 spelling of telegram.api-id
     "tg-api-hash": None,  # 3.0.0 spelling of telegram.api-hash
-    # CFG2-4
+    # keys new in this version
     "workspace": "workspace",
     "x-accel": None,
     "worker-parallel": 6,
@@ -44,7 +44,7 @@ DEFAULTS = {
     "run-history-days": 30,
 }
 
-# keys of 3.0.0 that no longer have a meaning (CFG2-1, CFG2-3, AUTH2-1)
+# keys of 3.0.0 that no longer have a meaning
 REMOVED = {
     "http", "ssl-port", "keystore", "keystore-password", "keystore-type", "keystore-reload-interval",
     "sni-host-check", "nrepl-port", "exclusive-jdbc-connection", "auto-backup-database", "password-hash",

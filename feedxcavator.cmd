@@ -1,5 +1,5 @@
 @echo off
-rem Starts Feedxcavator from this directory and starts it again when it exits with code 3 (LFC-1).
+rem Starts Feedxcavator from this directory and starts it again when it exits with code 3.
 setlocal
 cd /d "%~dp0"
 set "PATH=%~dp0;%PATH%"

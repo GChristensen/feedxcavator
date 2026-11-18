@@ -1,4 +1,4 @@
-"""A local RPC channel from the web process to the worker, for the browser pool and Telegram (PRC-4, TG-4).
+"""A local RPC channel from the web process to the worker, for the browser pool and Telegram.
 
 The worker listens on 127.0.0.1 and writes its port and key to data/worker.rpc.
 """

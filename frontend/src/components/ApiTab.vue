@@ -1,5 +1,5 @@
 <script setup>
-// The API tab (UI-19, UC2-21): generated from the docstrings of the user library.
+// The API tab: generated from the docstrings of the user library.
 import { computed, onMounted, ref } from 'vue'
 import { api, describeError } from '../api'
 

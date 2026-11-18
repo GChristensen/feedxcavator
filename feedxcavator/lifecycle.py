@@ -1,4 +1,4 @@
-"""Process lifecycle: restarts, child process tracking, and recovery after a forced kill (LFC-1 to LFC-5)."""
+"""Process lifecycle: restarts, child process tracking, and recovery after a forced kill."""
 
 from __future__ import annotations
 
@@ -34,7 +34,7 @@ def _descendants() -> list[psutil.Process]:
 
 
 def stop_orphaned_children():
-    """LFC-4: kills the processes recorded by an instance that did not shut down cleanly."""
+    """Kills the processes recorded by an instance that did not shut down cleanly."""
     path = children_file()
     if not path.exists():
         return
@@ -63,7 +63,7 @@ def _kill(process: psutil.Process):
 
 
 def delete_stale_temp_files():
-    """LFC-5: temporary payload files older than this process are leftovers of a killed write."""
+    """Temporary payload files older than this process are leftovers of a killed write."""
     started = psutil.Process().create_time()
     for root in (conf.FILES_DIR,):
         if not root.is_dir():
@@ -127,7 +127,7 @@ class ChildTracker:
 
 
 def stop_child_processes(timeout: float = 5):
-    """LFC-3: on shutdown, terminates every child process and forgets them."""
+    """On shutdown, terminates every child process and forgets them."""
     children = _descendants()
     for child in reversed(children):
         try:
@@ -144,7 +144,7 @@ def stop_child_processes(timeout: float = 5):
 
 
 def request_restart(delay: float = 0.5):
-    """LFC-2: exits with the restart code shortly, so the current response is delivered."""
+    """Exits with the restart code shortly, so the current response is delivered."""
 
     def exit_later():
         time.sleep(delay)

@@ -1,4 +1,4 @@
-"""Task and schedule definitions from tasks.yaml and schedules.yaml (PORT-REQUIREMENTS sections 11, 12)."""
+"""Task and schedule definitions from tasks.yaml and schedules.yaml."""
 
 from __future__ import annotations
 
@@ -168,7 +168,7 @@ class ScheduleDef:
 
 
 def local_timezone():
-    """SCH-2: the server's local zone."""
+    """The server's local zone."""
     try:
         from tzlocal import get_localzone
 
@@ -207,7 +207,7 @@ def parse_tasks(text: str) -> dict[str, TaskDef]:
 
 
 def parse_schedules(text: str) -> list[ScheduleDef]:
-    """Parses schedules.yaml. Duplicates are ignored (SCH-5). Raises DefinitionError."""
+    """Parses schedules.yaml. Duplicates are ignored. Raises DefinitionError."""
     tree = load_yaml(text)
     raw = plain(tree) if tree is not None else {}
     try:
@@ -225,7 +225,7 @@ def parse_schedules(text: str) -> list[ScheduleDef]:
 
 
 def find_cycles(tasks: dict[str, TaskDef]) -> set[str]:
-    """TSK2-3: the names of the tasks that take part in a cycle of `run`."""
+    """The names of the tasks that take part in a cycle of `run`."""
     in_cycle: set[str] = set()
 
     def visit(name, stack):
@@ -252,7 +252,7 @@ def schedules_schema() -> dict:
 
 
 def feed_matches(task: TaskDef, feed) -> bool:
-    """TSK2-2: tags, path globs, suffix list, and the feed's own `tasks` field."""
+    """How a task selects feeds: tags, path globs, suffix list, and the feed's own `tasks` field."""
     name = task.name.lower()
     if any(str(t).lower() == name for t in feed.get("tasks") or []):
         return True

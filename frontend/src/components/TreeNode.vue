@@ -1,5 +1,5 @@
 <script setup>
-// One node of the workspace tree (UI2-6, UI2-7). Feed directories are shown as feeds.
+// One node of the workspace tree. Feed directories are shown as feeds.
 import { computed, inject } from 'vue'
 import { icon } from '../outline'
 

@@ -1,4 +1,4 @@
-// Outlines built by scanning the source text (UI-13, UI2-7b).
+// Outlines built by scanning the source text.
 
 const PY = [
   [/^@extractor\(\s*["']([^"']+)["']/, 'extractor'],

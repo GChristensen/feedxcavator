@@ -1,4 +1,4 @@
-"""Command line entry point and the supervisor that runs the web and worker processes (PRC-1)."""
+"""Command line entry point and the supervisor that runs the web and worker processes."""
 
 from __future__ import annotations
 
@@ -34,7 +34,7 @@ def _migrate():
 
 
 def _log_writer():
-    """LOG-5: log/app.log, rotated at 5 MB with one backup. The supervisor is its only writer."""
+    """log/app.log, rotated at 5 MB with one backup. The supervisor is its only writer."""
     from feedxcavator import conf
 
     conf.LOG_DIR.mkdir(parents=True, exist_ok=True)
@@ -91,7 +91,7 @@ def run_supervisor(dev: bool = False) -> int:
         start(name)
     host = conf.get("host") or "0.0.0.0"  # noqa: S104
     line = f"Feedxcavator started on http {'*' if host in ('0.0.0.0', '::') else host}:{conf.get('port')}"  # noqa: S104
-    print(line, flush=True)  # CFG-10
+    print(line, flush=True)  # one line with the active listeners
     logger.info(line)
 
     exit_code = 0
@@ -101,7 +101,7 @@ def run_supervisor(dev: bool = False) -> int:
             code = process.poll()
             if code is None:
                 continue
-            if code == lifecycle.RESTART_EXIT_CODE:  # LFC-2: a restart requested from the console
+            if code == lifecycle.RESTART_EXIT_CODE:  # a restart requested from the console
                 exit_code = lifecycle.RESTART_EXIT_CODE
                 stopping.set()
                 break
@@ -118,7 +118,7 @@ def run_supervisor(dev: bool = False) -> int:
         stopping.wait(0.5)
 
     tracker.stop()
-    for process in processes.values():  # LFC-3
+    for process in processes.values():  # stop the children on shutdown
         if process.poll() is None:
             try:
                 if os.name == "nt":
@@ -146,13 +146,13 @@ def run_web(dev: bool = False):
         "feedxcavator.asgi:application",
         host=conf.get("host") or "0.0.0.0",  # noqa: S104
         port=int(conf.get("port")),
-        server_header=False,  # CFG-8
+        server_header=False,  # no Server version header
         date_header=True,
-        timeout_keep_alive=60,  # CFG-7
+        timeout_keep_alive=60,  # a stalled client does not hold a connection forever
         lifespan="off",
         log_level="info" if dev else "warning",
         access_log=dev,
-        reload=dev,  # CFG-9
+        reload=dev,  # code reloading with --dev
         reload_dirs=[os.path.dirname(os.path.abspath(__file__))] if dev else None,
     )
 

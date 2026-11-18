@@ -1,5 +1,5 @@
 <script setup>
-// The Log tab (UI-15 to UI-17).
+// The Log tab: the application log, and the server log on request.
 import { nextTick, onMounted, reactive, ref, watch } from 'vue'
 import { api, describeError } from '../api'
 import { formatTime } from '../time'
@@ -55,7 +55,7 @@ async function showServerLog() {
   try {
     serverLog.value = (await api.get('/server-log')).content || '(log/app.log is empty)'
     await nextTick()
-    if (list.value) list.value.scrollTop = list.value.scrollHeight // UI-17: scrolled to the end
+    if (list.value) list.value.scrollTop = list.value.scrollHeight // scrolled to the end
   } catch (e) {
     error.value = describeError(e)
   }

@@ -1,5 +1,5 @@
 <script setup>
-// The Schedules tab (UI2-8): edits go to schedules.yaml, preserving its comments.
+// The Schedules tab: edits go to schedules.yaml, preserving its comments.
 import { computed, inject, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import { api, describeError } from '../api'
 import { formatTime } from '../time'

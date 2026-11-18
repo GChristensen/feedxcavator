@@ -1,4 +1,4 @@
-# systemd user unit (LFC-1). Install with:
+# systemd user unit. Install with:
 #   cp deploy/feedxcavator.service ~/.config/systemd/user/
 #   systemctl --user daemon-reload && systemctl --user enable --now feedxcavator
 #   loginctl enable-linger "$USER"     # keep it running without a login session

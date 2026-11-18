@@ -1,4 +1,4 @@
-"""The WebSub hub (WS-1 to WS-9 with the fixes of API2-5)."""
+"""The WebSub hub."""
 
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ def enabled() -> bool:
 
 
 def feed_from_topic(topic: str):
-    """Resolves /feed/<suffix> and /feed/uuid:<id> (fixes section 17.5)."""
+    """Resolves /feed/<suffix> and /feed/uuid:<id>."""
     from feedxcavator import workspace
 
     if not topic or "/feed/" not in topic:
@@ -33,7 +33,7 @@ def feed_from_topic(topic: str):
 
 
 def _with_params(url: str, params: dict) -> str:
-    """Appends parameters with `?` or `&` as needed (fixes section 17.7)."""
+    """Appends parameters with `?` or `&` as needed."""
     return f"{url}{'&' if '?' in url else '?'}{urlencode(params)}"
 
 
@@ -129,7 +129,7 @@ def unsubscribe(params, background=True) -> int:
 
 
 def publish_content(feed, result: dict) -> int:
-    """WS-6: POSTs a feed document to every verified subscriber whose lease has not expired.
+    """POSTs a feed document to every verified subscriber whose lease has not expired.
     Returns the number of successful deliveries."""
     from feedxcavator.models import Subscription
 
@@ -154,7 +154,7 @@ def publish_content(feed, result: dict) -> int:
         response = fetch.fetch_url(callback, method="POST", insecure=True, proxy=False, headers=headers,
                                    payload=body)
         if response is None:
-            with context.scope(source="websub"):  # WS-8
+            with context.scope(source="websub"):
                 error = fetch.get_last_network_error()
                 if error is not None:
                     applog.write("error", f"WebSub delivery to {callback} failed: {error!r}")
@@ -171,7 +171,7 @@ def publish_content(feed, result: dict) -> int:
 
 
 def publish(params) -> int:
-    """hub.mode=publish: pushes the stored output of the feed (fixes section 17.6)."""
+    """hub.mode=publish: pushes the stored output of the feed."""
     feed = feed_from_topic(params.get("hub.url") or params.get("hub.topic"))
     if feed is None:
         return 404
@@ -196,7 +196,7 @@ def hub_action(params) -> int:
 
 
 def delete_feed_subscriptions(feed_id: str):
-    """WS-9."""
+    """Deletes the subscriptions of a feed."""
     from feedxcavator.models import Subscription
 
     Subscription.objects.filter(feed_id=feed_id).delete()

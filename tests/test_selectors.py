@@ -22,23 +22,23 @@ def feed(**selectors):
 def test_basic_parts_and_defaults():
     headlines = sel.apply_selectors(PAGE, feed(item="article.post", title="h2", link="a", image="img",
                                                summary="p.preview"))
-    assert len(headlines) == 2  # FD-14: the blank item is dropped
+    assert len(headlines) == 2  # the blank item is dropped
     first, second = headlines
-    assert first["title"] == "First &amp; <b>best</b>"  # FD-8: inner HTML
+    assert first["title"] == "First &amp; <b>best</b>"  # inner HTML
     assert first["link"] == "https://example.com/p/1"  # href by default, made absolute
     assert first["image"] == "https://example.com/list/blank.gif"  # src by default
     assert second["link"] == "https://example.com/list/p/2"
     assert second["image"] == "https://example.com/list/img/2.png"
-    assert isinstance(first["html"], Selector)  # FD-15
+    assert isinstance(first["html"], Selector)  # the item element
 
 
 def test_text_attr_and_legacy_attribute_list():
     headlines = sel.apply_selectors(PAGE, feed(
         item="article.post", title="h2::text", link="a::attr(href)",
-        image="img::data-src||src",  # SEL-3
+        image="img::data-src||src",  # the first attribute present
     ))
     assert headlines[0]["title"] == "First & best"
-    assert headlines[0]["image"] == "https://cdn.test/1.jpg?w=100"  # SEL-6: the scheme of the source
+    assert headlines[0]["image"] == "https://cdn.test/1.jpg?w=100"  # the scheme of the source
     assert headlines[1]["image"] == "https://example.com/list/img/2.png"
     mixed = sel.apply_selectors(PAGE, feed(item="article.post", image="img::attr(data-src)||src"))
     assert mixed[0]["image"].startswith("https://cdn.test/")
@@ -59,7 +59,7 @@ def test_part_options():
     assert first["category"] == ["one", "two"]
     assert first["summary"] == "Summary one"
     assert first["image"] == "https://cdn.test/1.jpg"
-    assert first["views"] == "best"  # an unknown part name becomes an extra field (SEL-8)
+    assert first["views"] == "best"  # an unknown part name becomes an extra field
     assert second["summary"] == "" and second["category"] == []
 
 

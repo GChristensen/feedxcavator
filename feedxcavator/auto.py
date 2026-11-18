@@ -1,4 +1,4 @@
-"""Automatic extraction (PORT-REQUIREMENTS section 10): feed discovery, structured data, and detection
+"""Automatic extraction: feed discovery, structured data, and detection
 of the repeated item structure of a page. The last step also backs "Suggest selectors"."""
 
 from __future__ import annotations
@@ -427,7 +427,7 @@ def from_structure(document: Selector, url: str) -> tuple[list[dict], dict | Non
 
 
 def extract_from_document(feed, url: str, document) -> list[dict]:
-    """AUTO-1: the first step that gives results wins. OpenGraph describes the page itself, so it is
+    """The first step that gives results wins. OpenGraph describes the page itself, so it is
     used only when nothing else was found."""
     if not isinstance(document, Selector):
         return []
@@ -449,7 +449,7 @@ def extract_from_document(feed, url: str, document) -> list[dict]:
 
 
 def suggest_for_url(url: str, fetch_options: dict | None = None) -> dict | None:
-    """AUTO-2: fetches the source and proposes selectors for it."""
+    """Fetches the source and proposes selectors for it."""
     from feedxcavator.feeddef import Feed
     from feedxcavator import context, extraction
 

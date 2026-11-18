@@ -1,4 +1,4 @@
-"""Backup and restore (STO2-15): a zip with one JSON file per model and, optionally, the workspace."""
+"""Backup and restore: a zip with one JSON file per model and, optionally, the workspace."""
 
 from __future__ import annotations
 

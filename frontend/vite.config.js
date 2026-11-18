@@ -1,7 +1,7 @@
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 
-// The built console is served by Django from feedxcavator/static/console (STK-3).
+// The built console is served by Django from feedxcavator/static/console.
 // `vite build --mode demo` (npm run build:demo) builds the static demo with its mock backend into ../demo,
 // served by GitHub Pages; .env.demo sets VITE_DEMO.
 export default defineConfig(({ mode }) => {

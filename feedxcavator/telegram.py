@@ -1,4 +1,4 @@
-"""Telegram support on Telethon (TG-1 to TG-7).
+"""Telegram support on Telethon.
 
 The client runs in the worker and is connected per call, as in 3.0.0. Calls are serialized. Calls made
 in the web process (a console test) are forwarded to the worker.
@@ -35,7 +35,7 @@ def _inactive_reason() -> str | None:
 
 
 def proxy_name(proxy=None):
-    """TG2-1: the proxy a call uses, resolved in the calling process. `telegram.use-proxy`, when set, is used
+    """The proxy a call uses, resolved in the calling process. `telegram.use-proxy`, when set, is used
     for every call. Otherwise an explicit name, with False for a direct connection; otherwise the `fetch.proxy`
     of the current feed; otherwise a direct connection."""
     forced = conf.telegram("use-proxy")
@@ -118,7 +118,7 @@ _BARE_URL = re.compile(r"(?<![\](<\"'=])(https?://[^\s<>)\]]+)")
 
 
 def render_text(text: str) -> str:
-    """Markdown to HTML. Bare URLs become links and a leading `#` on a word becomes `_` (INT-3)."""
+    """Markdown to HTML. Bare URLs become links and a leading `#` on a word becomes `_`."""
     import markdown
 
     text = re.sub(r"(^|\s)#", r"\1_", text or "")
@@ -220,7 +220,7 @@ async def _notify(message: str, chat_id, proxy=None) -> bool:
 
 
 def _run(coroutine):
-    with _lock:  # TG-3: calls are serialized
+    with _lock:  # calls are serialized
         try:
             return asyncio.run(coroutine)
         finally:
@@ -232,7 +232,7 @@ def _run(coroutine):
 def _local_get_channel_messages(channel, limit=MESSAGE_LIMIT, proxy=None):
     reason = _inactive_reason()
     if reason:
-        applog.write("warning", reason)  # TG-5
+        applog.write("warning", reason)
         return []
     try:
         return _run(_get_channel_messages(str(channel), min(int(limit or MESSAGE_LIMIT), MESSAGE_LIMIT), proxy))
@@ -298,7 +298,7 @@ def _user_name(user) -> str:
 
 
 def login(qr: bool = False):
-    """TG-6: the interactive login that creates the session: by QR code scanned in the Telegram app, or by
+    """The interactive login that creates the session: by QR code scanned in the Telegram app, or by
     phone number and the code Telegram sends (to the app, by SMS or call, or by email)."""
     if not configured():
         raise SystemExit("Set telegram.api-id and telegram.api-hash in config.yml first.")

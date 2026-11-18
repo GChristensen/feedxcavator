@@ -1,4 +1,4 @@
-// A Hy mode for Ace, derived from the Clojure mode (UI2-4): Hy's special forms, the prelude macros,
+// A Hy mode for Ace, derived from the Clojure mode: Hy's special forms, the prelude macros,
 // and `#` reader syntax.
 import ace from 'ace-builds/src-noconflict/ace'
 import 'ace-builds/src-noconflict/mode-clojure'

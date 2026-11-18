@@ -1,4 +1,4 @@
-"""Request context, access control (AUTH-5) and CSRF for the console API (AUTH2-3)."""
+"""Request context, access control and CSRF for the console API."""
 
 from __future__ import annotations
 

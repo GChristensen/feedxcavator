@@ -1,7 +1,7 @@
-"""The workspace: loading user code and feed definitions from disk (PORT-REQUIREMENTS sections 4, 5).
+"""The workspace: loading user code and feed definitions from disk.
 
-A full load builds a new namespace and registry and swaps them in at once (UC2-5). A broken feed file
-disables only its feed, a broken lib file keeps the previous state running (D-2).
+A full load builds a new namespace and registry and swaps them in at once. A broken feed file
+disables only its feed, a broken lib file keeps the previous state running.
 """
 
 from __future__ import annotations
@@ -149,7 +149,7 @@ class Registry:
 
     # tasks
     def task(self, name: str) -> taskdefs.TaskDef:
-        """TSK-1, TSK-2: a declared task, or an implicit one named in the feeds, or an empty one."""
+        """A declared task, or an implicit one named in the feeds, or an empty one."""
         declared = self.tasks.get(name) or next(
             (t for n, t in self.tasks.items() if n.lower() == name.lower()), None
         )
@@ -269,7 +269,7 @@ def _new_module(source: dict | None = None) -> types.ModuleType:
 
 
 def _register_source(relpath: str, source: str):
-    """UC2-11: tracebacks at run time point into the workspace."""
+    """Tracebacks at run time point into the workspace."""
     linecache.cache[relpath] = (len(source), None, source.splitlines(True), relpath)
 
 
@@ -277,7 +277,7 @@ _reader_class = None
 
 
 def hy_reader():
-    """A Hy reader that accepts dots in keywords, for Enlive-style selector vectors (SEL-12)."""
+    """A Hy reader that accepts dots in keywords, for Enlive-style selector vectors."""
     global _reader_class
     if _reader_class is None:
         from hy.models import Keyword
@@ -333,8 +333,8 @@ def describe_error(exc: BaseException, relpath: str) -> FileError:
 
 
 def _merge(shared: types.ModuleType, unit_module: types.ModuleType, base: types.ModuleType | None = None):
-    """UC2-9: the names a unit added or changed go back into the shared namespace. Names the unit
-    only inherited from `base` (a group library, WS2-9) do not."""
+    """The names a unit added or changed go back into the shared namespace. Names the unit
+    only inherited from `base` (a group library) do not."""
     target = shared.__dict__
     origin = (base or shared).__dict__
     for key, value in unit_module.__dict__.items():
@@ -362,7 +362,7 @@ def _code_files(directory: Path, recursive: bool) -> list[Path]:
 
 
 def _lib_order(lib: Path, files: list[Path]) -> list[Path]:
-    """UC2-3: the order of lib/_order.yaml, then alphabetically."""
+    """The order of lib/_order.yaml, then alphabetically."""
     order_file = lib / "_order.yaml"
     if not order_file.exists():
         return files
@@ -386,8 +386,8 @@ def _lib_order(lib: Path, files: list[Path]) -> list[Path]:
 
 
 def feed_dirs(root: Path) -> list[Path]:
-    """WS2-3: directories under feeds/ that contain feed.yaml. Feeds do not nest, and group
-    libraries (WS2-9) are not searched for feeds."""
+    """Directories under feeds/ that contain feed.yaml. Feeds do not nest, and group
+    libraries are not searched for feeds."""
     feeds_root = root / "feeds"
     found = []
 
@@ -410,7 +410,7 @@ def feed_dirs(root: Path) -> list[Path]:
 
 
 def _is_group_lib(directory: Path) -> bool:
-    """WS2-9: a `lib` directory in a group folder (feeds/ itself included) that is not a feed."""
+    """A `lib` directory in a group folder (feeds/ itself included) that is not a feed."""
     return directory.name == "lib" and directory.is_dir() and not (directory / "feed.yaml").is_file() \
         and not (directory.parent / "feed.yaml").is_file()
 
@@ -431,7 +431,7 @@ def group_dirs(root: Path, feed_dir: Path) -> list[Path]:
 
 
 def template_dirs(root: Path, feed_dir: Path | None = None) -> list[Path]:
-    """FD2-6, WS2-9: where `extends` looks, nearest first: the group libraries of the feed, then lib/."""
+    """Where `extends` looks, nearest first: the group libraries of the feed, then lib/."""
     groups = group_dirs(root, feed_dir) if feed_dir is not None else []
     return [g / "lib" for g in reversed(groups) if _is_group_lib(g / "lib")] + [root / "lib"]
 
@@ -508,7 +508,7 @@ def _load_unit(registry, shared, label, files: list[tuple[str, Path]], isolate=T
     """Evaluates the files of one unit. On success merges its names and commits its registrations.
 
     An isolated unit evaluates into a copy of `base` (by default the shared namespace). With
-    `merge` false its names stay in its own module, `registry._last_unit.module` (WS2-9)."""
+    `merge` false its names stay in its own module, `registry._last_unit.module`."""
     global _unit
     unit = _Unit(registry, label)
     module = _new_module((base or shared).__dict__) if isolate else shared
@@ -540,7 +540,7 @@ def build(root: Path, previous: Registry | None, startup: bool) -> Registry:
 
     registry = Registry()
     shared = _new_module()
-    userlib.install(shared)  # a failure here is fatal (UC2-7)
+    userlib.install(shared)  # a failure here is fatal
     registry.namespace = shared.__dict__
 
     # lib/
@@ -556,7 +556,7 @@ def build(root: Path, previous: Registry | None, startup: bool) -> Registry:
         if error:
             registry.errors.append(error)
             if not startup:
-                registry.abandoned = True  # UC2-7: the previous namespace stays live
+                registry.abandoned = True  # the previous namespace stays live
                 return registry
 
     # feeds/
@@ -566,7 +566,7 @@ def build(root: Path, previous: Registry | None, startup: bool) -> Registry:
     groups: dict[Path, types.ModuleType | FileError] = {}  # group folder -> its namespace, or its error
 
     def group_namespace(directory: Path) -> types.ModuleType | FileError:
-        """WS2-9: the namespace the feeds of a directory start from, loading group libraries on first use."""
+        """The namespace the feeds of a directory start from, loading group libraries on first use."""
         base: types.ModuleType = shared
         for group in group_dirs(root, directory):
             if group not in groups:
@@ -656,24 +656,24 @@ def build(root: Path, previous: Registry | None, startup: bool) -> Registry:
         feed = feeddef.make_feed(definition, path)
         info.title = feed["title"]
         info.enabled, info.tasks, info.tags = feed["enabled"], list(feed["tasks"]), list(feed["tags"])
-        taken = claim(feed.get("id"), feed["suffix"])  # FD2-2, FD2-3
+        taken = claim(feed.get("id"), feed["suffix"])  # ids and suffixes are unique
         if taken:
             fail(taken[0], feeddef.line_of(tree, (taken[1],)))
             continue
 
         base = group_namespace(directory)
-        if isinstance(base, FileError):  # WS2-9: a broken group library disables the feeds of its group
+        if isinstance(base, FileError):  # a broken group library disables the feeds of its group
             fail(f"the group library failed to load: {base.path}: {base.message}")
             continue
 
-        if code:  # WS2-4, UC2-8, UC2-9
+        if code:  # the feed's code files form one unit
             files = [(p.relative_to(root).as_posix(), p) for p in code]
             error = _load_unit(registry, shared, rel_dir, files, base=base)
             if error:
                 fail(error.message, error.line, error.traceback, file=error.path)
                 continue
             own = [r for r in registry._last_unit.pending if r.kind == "extractor"]
-            if not feed.get("extractor") and len(own) == 1:  # UC2-14
+            if not feed.get("extractor") and len(own) == 1:  # the only extractor in the directory
                 feed = feed.replace(extractor=own[0].name)
         info.feed = feed
 
@@ -681,7 +681,7 @@ def build(root: Path, previous: Registry | None, startup: bool) -> Registry:
     for path in _code_files(root / "handlers", recursive=True):
         relpath = path.relative_to(root).as_posix()
         error = _load_unit(registry, shared, relpath, [(relpath, path)])
-        if error:  # UC2-10
+        if error:
             registry.errors.append(error)
             names = set(registry._last_failed_unit.failed_names)
             if previous is not None:
@@ -699,7 +699,7 @@ def build(root: Path, previous: Registry | None, startup: bool) -> Registry:
             info.status, info.error = "error", f"extractor '{feed['extractor']}' is not defined"
             registry.errors.append(FileError(f"{info.dir}/feed.yaml", None, info.error))
 
-    # tasks.yaml and schedules.yaml, read after the code (UC2-3)
+    # tasks.yaml and schedules.yaml, read after the code
     for name, parser, target in (("tasks.yaml", taskdefs.parse_tasks, "tasks"),
                                  ("schedules.yaml", taskdefs.parse_schedules, "schedules")):
         path = root / name
@@ -712,7 +712,7 @@ def build(root: Path, previous: Registry | None, startup: bool) -> Registry:
                 registry.errors.append(FileError(name, d.line, d.message))
         except OSError as e:
             registry.errors.append(FileError(name, None, str(e)))
-    for name in taskdefs.find_cycles(registry.tasks):  # TSK2-3
+    for name in taskdefs.find_cycles(registry.tasks):
         registry.tasks[name].error = "the task is part of a cycle of 'run'"
         registry.errors.append(FileError("tasks.yaml", None, f"task '{name}' is part of a cycle of 'run'"))
     for task in registry.tasks.values():
@@ -728,7 +728,7 @@ def build(root: Path, previous: Registry | None, startup: bool) -> Registry:
 
 
 def load(startup: bool = False, force: bool = True) -> Registry:
-    """A full load (UC2-3 to UC2-10). Returns the registry that was built: the live one, or an
+    """A full load. Returns the registry that was built: the live one, or an
     abandoned one whose `errors` explain why the previous state was kept."""
     global _live, _load_thread, _last_signature
     from feedxcavator import fetch
@@ -772,7 +772,7 @@ def load(startup: bool = False, force: bool = True) -> Registry:
 
 
 def _report(registry: Registry):
-    """UC2-7: load errors are logged."""
+    """Load errors are logged."""
     from feedxcavator import applog
 
     if not registry.errors:
@@ -792,7 +792,7 @@ _reported = None
 
 
 def sync_index(registry: Registry):
-    """STO2-2: FeedIndex mirrors the feeds of the workspace."""
+    """FeedIndex mirrors the feeds of the workspace."""
     from django.db import transaction
 
     from feedxcavator.models import FeedIndex
@@ -840,7 +840,7 @@ def _watch_filter(change, path: str) -> bool:
 
 
 def start_watcher(debounce_ms: int = 500) -> threading.Thread:
-    """UC2-6: reloads when workspace files change, however they were changed (WS2-5)."""
+    """Reloads when workspace files change, however they were changed."""
     root = conf.workspace_dir()
     root.mkdir(parents=True, exist_ok=True)
 
@@ -894,7 +894,7 @@ def ensure_layout():
 
 
 def run_scratch(source: str, relpath: str = "scratch.hy") -> dict:
-    """UC2-20: runs code in an isolated copy of the live namespace and returns what it printed."""
+    """Runs code in an isolated copy of the live namespace and returns what it printed."""
     from feedxcavator import applog
 
     applog.install_stdout()

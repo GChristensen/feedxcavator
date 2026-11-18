@@ -1,5 +1,5 @@
 <script setup>
-// The Settings tab (UI-18, with the changes of STO2-13, STO2-14 and STO2-15).
+// The Settings tab: the subscription URL, the API token, backup and restore.
 import { inject, onMounted, reactive, ref } from 'vue'
 import { api, describeError } from '../api'
 import { formatTime } from '../time'

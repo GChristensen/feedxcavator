@@ -6,9 +6,9 @@ from feedxcavator import feeddef, tasks
 def test_defaults_and_extra_fields():
     definition, _ = feeddef.parse_definition("title: T\nsource: https://e.test\ncustom: [1, 2]\n")
     feed = feeddef.make_feed(definition, "news/local/city-paper")
-    assert feed.suffix == "city-paper"  # FD2-3: defaults to the directory name
+    assert feed.suffix == "city-paper"  # defaults to the directory name
     assert feed.group == "news/local"
-    assert feed.custom == [1, 2] and feed["custom"] == [1, 2]  # FD-2
+    assert feed.custom == [1, 2] and feed["custom"] == [1, 2]  # extra fields
     assert feed.enabled is True and feed.parallel is True and feed.tasks == []
     assert feed.fetch["backend"] == "http" and feed.fetch["charset"] == "auto" and feed.fetch["retry"] == 2
     assert feed.output == {"format": "rss", "limit": None}
@@ -38,7 +38,7 @@ def test_validation_errors_carry_line_numbers():
     with pytest.raises(feeddef.DefinitionError) as error:
         feeddef.parse_definition(text)
     by_line = {d.line: d.message for d in error.value.diagnostics}
-    assert "EDN" in by_line[3]  # OUT-4
+    assert "EDN" in by_line[3]  # edn output is no longer supported
     assert "backend" in by_line[5]
     assert any("div[" in m or "item" in m for line, m in by_line.items() if line in (6, 7))
     with pytest.raises(feeddef.DefinitionError) as error:
@@ -134,7 +134,7 @@ def test_schedules_yaml():
         "  - task: digest\n    cron: '30 8 * * mon'\n    timezone: Europe/Kyiv\n    misfire: run-once\n"
         "  - task: report\n    cron: '0 6 15 * *'\n    enabled: false\n"
     )
-    assert [s.task for s in parsed] == ["news", "digest", "report"]  # SCH-5: the duplicate is ignored
+    assert [s.task for s in parsed] == ["news", "digest", "report"]  # the duplicate is ignored
     assert parsed[1].misfire == "run-once" and str(parsed[1].tzinfo()) == "Europe/Kyiv"
     assert parsed[2].enabled is False
     fires = parsed[1].next_fires(2)

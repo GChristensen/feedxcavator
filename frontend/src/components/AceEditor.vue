@@ -1,5 +1,5 @@
 <script setup>
-// Ace wrapped in a Vue component (UI2-3). The parent owns the edit sessions, one per open file,
+// Ace wrapped in a Vue component. The parent owns the edit sessions, one per open file,
 // so every file keeps its own undo history.
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { createEditor, createSession } from '../ace'
@@ -18,7 +18,7 @@ const empty = createSession('', 'text')
 onMounted(() => {
   editor = createEditor(host.value, { readOnly: props.readOnly })
   editor.setSession(props.session || empty)
-  // UI-8: Ctrl+S or Cmd+S saves, and the browser's own save dialog is suppressed
+  // Ctrl+S or Cmd+S saves, and the browser's own save dialog is suppressed
   editor.commands.addCommand({
     name: 'save',
     bindKey: { win: 'Ctrl-S', mac: 'Command-S' },

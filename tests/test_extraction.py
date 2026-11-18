@@ -46,14 +46,14 @@ def test_builtin_extractor_rss(http):
     from email.utils import parsedate_to_datetime
 
     dates = [parsedate_to_datetime(i.findtext("pubDate")) for i in items]
-    assert dates[0] - dates[1] == timedelta(seconds=5) and dates[1] - dates[2] == timedelta(seconds=5)  # EX-8
+    assert dates[0] - dates[1] == timedelta(seconds=5) and dates[1] - dates[2] == timedelta(seconds=5)  # 5 seconds apart
     assert items[0].find("guid") is None
 
 
 def test_error_feeds(http):
     http.routes["/list"] = (500, {}, "")
     feed = make_feed(http.url + "/list", "fetch: {retry: false}\n")
-    assert "HTTP error: 500" in extraction.run_feed(feed, "request").output["output"]  # EX-3
+    assert "HTTP error: 500" in extraction.run_feed(feed, "request").output["output"]  # the error headline
     assert "Network error." in extraction.run_feed(make_feed("http://127.0.0.1:9/x", "fetch: {retry: false, timeout: 2}\n"),
                                                     "request").output["output"]
     background = extraction.run_feed(feed, "background")
@@ -69,7 +69,7 @@ def test_numeric_pages_and_follow_next(http):
         http.routes[f"/list/p{n}"] = page([n])
     feed = make_feed(http.url + "/list", "pages: {path: '/p{n}', start: 20, end: 3, increment: 20}\n")
     assert [h["title"] for h in extraction.default_feed_parser(feed)] == ["Title 1", "Title 20", "Title 40",
-                                                                         "Title 60"]  # FD-17
+                                                                         "Title 60"]
     legacy = make_feed(http.url + "/list", "pages: {path: '/p%n', start: 20, end: 1, increment: 20, include-source: false}\n")
     assert [h["title"] for h in extraction.default_feed_parser(legacy)] == ["Title 20"]
 
@@ -77,7 +77,7 @@ def test_numeric_pages_and_follow_next(http):
     http.routes["/b"] = page([2], "/c")
     http.routes["/c"] = page([3], "/d")
     follow = make_feed(http.url + "/a", "pages: {next: 'a.next::attr(href)', max: 2}\n")
-    assert [h["title"] for h in extraction.default_feed_parser(follow)] == ["Title 1", "Title 2"]  # FD2-9
+    assert [h["title"] for h in extraction.default_feed_parser(follow)] == ["Title 1", "Title 2"]  # the `next` link, up to `max` pages
 
 
 def test_several_sources_json_and_charset(http):
@@ -91,7 +91,7 @@ def test_several_sources_json_and_charset(http):
     definition, _ = feeddef.parse_definition(
         f"source: {http.url}/api\nselectors: {{item: 'jmes:items', title: 'jmes:name', link: 'jmes:href'}}\n")
     assert extraction.default_feed_parser(feeddef.make_feed(definition, "j")) == [
-        {"title": "J", "link": http.url + "/j"}]  # SEL-5
+        {"title": "J", "link": http.url + "/j"}]  # jmes: selectors on JSON
 
     http.routes["/cp1251"] = (200, {"Content-Type": "text/html; charset=windows-1251"},
                               ITEM.format(n=1).replace("Title", "Заголовок").encode("windows-1251"))
@@ -107,16 +107,16 @@ def test_filter_steps_and_history(http):
         "  - wordfilter: {name: spam, fields: [title, summary]}\n  - exclude: {field: title, regex: '^Title 1$'}\n"
         "  - limit: 5\n"))
     titles = lambda mode: [h["title"] for h in extraction.run_feed(feed, mode).headlines]  # noqa: E731
-    assert titles("test") == ["Title 2"]  # a test skips history (FD-20)
+    assert titles("test") == ["Title 2"]  # a test skips history
     assert HistoryKey.objects.count() == 0
     assert titles("request") == ["Title 2"]
     assert HistoryKey.objects.count() == 4
     assert titles("request") == []
     http.routes["/list"] = page([2, 5])
     assert titles("request") == ["Title 5"]
-    assert HistoryKey.objects.count() == 4  # FD2-11: the last `keep` keys
+    assert HistoryKey.objects.count() == 4  # the last `keep` keys
 
-    key_feed = "some string key"  # UC-8
+    key_feed = "some string key"  # a history keyed by any string
     items = [{"guid": "g1", "link": "l1"}, {"guid": "g2", "link": "l2"}]
     assert len(filters.filter_history_by_guid_update(key_feed, items)) == 2
     assert filters.filter_history_by_guid_update(key_feed, items) == []
@@ -144,10 +144,10 @@ def test_output_formats():
     assert hub == ["http://feeds.test/websub"]
     first, second = items
     assert first.findtext("title") == "A <b>&" and first.findtext("author") == "Ann"
-    assert [c.text for c in first.findall("category")] == ["x", "y"]  # once per value (fixes 17.3)
-    assert first.findtext("{http://purl.org/rss/1.0/modules/content/}encoded") == "<p>full</p>"  # OUT-1
+    assert [c.text for c in first.findall("category")] == ["x", "y"]  # once per value
+    assert first.findtext("{http://purl.org/rss/1.0/modules/content/}encoded") == "<p>full</p>"  # content:encoded
     assert first.find("enclosure").get("type") == "image/png" and first.find("guid").text == "g-a"
-    assert first.findtext("pubDate").startswith("Wed, 01 May 2024 10:00:00")  # OUT-2
+    assert first.findtext("pubDate").startswith("Wed, 01 May 2024 10:00:00")  # from `published`
     assert second.find("guid").text == "https://e.test/b"  # a WebSub feed without a guid uses the link
     assert [c.text for c in second.findall("category")] == ["solo"]
 
@@ -165,7 +165,7 @@ def test_output_formats():
 
     plain = output.produce_feed_output(feed.replace(output={"format": "json", "limit": 1}), headlines)
     data = json.loads(plain["output"])
-    assert len(data) == 1 and "guid" not in data[0] and "html" not in data[0] and data[0]["extra"] == 1  # OUT-4, OUT-5
+    assert len(data) == 1 and "guid" not in data[0] and "html" not in data[0] and data[0]["extra"] == 1  # limited, without guid and html
     assert plain["content_type"] == "application/json"
 
 
@@ -192,7 +192,7 @@ def test_background_stores_and_publishes(http):
               "hub.callback": http.url + "/callback?x=1", "hub.secret": "s3cret"}
     assert websub.subscribe(params, background=False) == 202
     sub = Subscription.objects.get()
-    assert sub.verified and sub.expires_at > timezone.now()  # the challenge was echoed (fixes 17.5, 17.7)
+    assert sub.verified and sub.expires_at > timezone.now()  # the challenge was echoed
     verification = next(r for r in http.requests if r[0] == "GET" and "/callback" in r[1])
     assert verification[1].startswith("/callback?x=1&hub.mode=subscribe")
 
@@ -206,7 +206,7 @@ def test_background_stores_and_publishes(http):
     assert result.stored and len(result.headlines) == 3
     stored = storage.fetch_feed_output(feed["id"])
     assert stored["content_type"] == "application/rss+xml" and "Title 3" in stored["output"]
-    assert len(received) == 2  # WS-7: parts of 2, the last part first
+    assert len(received) == 2  # parts of 2, the last part first
     assert b"Title 3" in received[0][1] and b"Title 1" not in received[0][1] and b"Title 1" in received[1][1]
     # dates run over the whole list, not from "now" in each part: Title 3 is older than Title 2
     import re
@@ -221,11 +221,11 @@ def test_background_stores_and_publishes(http):
     assert 'rel="self"' in headers["link"] and 'rel="hub"' in headers["link"]
     assert headers["content-type"] == "application/rss+xml; charset=utf-8"
 
-    # a second subscriber is kept beside the first (STO2-8); a failed verification is dropped
+    # a second subscriber is kept beside the first; a failed verification is dropped
     http.routes["/liar"] = (200, {}, "wrong")
     websub.subscribe({**params, "hub.callback": http.url + "/liar"}, background=False)
     assert Subscription.objects.count() == 1
-    assert websub.hub_action({"hub.mode": "publish", "hub.url": "http://feeds.test/feed/test"}) == 204  # 17.6
+    assert websub.hub_action({"hub.mode": "publish", "hub.url": "http://feeds.test/feed/test"}) == 204  # publish pushes the stored output
     assert len(received) == 3
     Subscription.objects.update(expires_at=timezone.now() - timedelta(seconds=1))
     assert websub.publish_content(feed, stored) == 0 and Subscription.objects.count() == 0  # leases expire
@@ -244,7 +244,7 @@ def test_fulltext_and_transform(http, ws):
     feed = make_feed(http.url + "/list", "fulltext: true\ntransform: tag\n")
     headlines = extraction.run_feed(feed, "test").headlines
     assert headlines[0]["title"] == "[x] Title 1"
-    assert "Paragraph 7" in headlines[0]["summary"] and "menu" not in headlines[0]["summary"]  # AUTO-3
+    assert "Paragraph 7" in headlines[0]["summary"] and "menu" not in headlines[0]["summary"]  # the main text only
     assert headlines[1]["summary"] == "Summary 2"  # a page that cannot be fetched leaves the headline unchanged
     limited = extraction.run_feed(make_feed(http.url + "/list", "fulltext: {field: content, limit: 0}\n"), "test")
     assert "content" not in limited.headlines[0]
@@ -265,7 +265,7 @@ def test_post_process(http, ws):
     feed = make_feed(http.url + "/list", "post-process: keep\n")
     assert feed["post_process"] == "keep"
     assert [h["title"] for h in extraction.run_feed(feed, "test").headlines][-1] == "extra"
-    # the built-in extractor's error headline survives (EX-3)
+    # the built-in extractor's error headline survives
     http.routes["/gone"] = (404, {}, "")
     error = extraction.run_feed(make_feed(http.url + "/gone", "post_process: backwards\n"), "request")
     assert error.error.startswith("HTTP error")
@@ -287,7 +287,7 @@ def test_auto_mode(http):
     http.routes["/rss.xml"] = (200, {"Content-Type": "application/rss+xml"}, rss)
     definition, _ = feeddef.parse_definition(f"source: {http.url}/withfeed\nmode: auto\n")
     headlines = extraction.default_feed_parser(feeddef.make_feed(definition, "auto"))
-    assert headlines[0]["title"] == "From feed" and headlines[0]["link"] == http.url + "/f/1"  # AUTO-1 step 1
+    assert headlines[0]["title"] == "From feed" and headlines[0]["link"] == http.url + "/f/1"  # a discovered feed comes first
     assert headlines[0]["guid"] == "g1" and headlines[0]["category"] == ["c"]
 
     del http.routes["/rss.xml"]  # otherwise found as a common feed path
@@ -310,7 +310,7 @@ def test_auto_mode(http):
     assert len(headlines) == 5 and headlines[2]["title"].startswith("Structured headline number 2")  # step 3
     assert headlines[2]["link"] == http.url + "/n/2"
 
-    selectors = auto.suggest_for_url(http.url + "/plain")  # AUTO-2
+    selectors = auto.suggest_for_url(http.url + "/plain")
     assert selectors["item"].endswith("div.card") and selectors["title"] == "h3::text"
     assert selectors["link"] == "h3 a" and "data-src" in selectors["image"]
     assert selectors["published"] == {"css": "time::attr(datetime)", "parse": "date"}
@@ -384,7 +384,7 @@ def test_browser_backend(monkeypatch):
 
     monkeypatch.setattr(browser, "browser", _FakeBrowser(calls, body, fails=True))
     result = extraction.run_feed(feed, "request")
-    assert result.error == "Network error." and "Network error." in result.output["output"]  # EX-3, not a 500
+    assert result.error == "Network error." and "Network error." in result.output["output"]  # an error headline, not a 500
 
     monkeypatch.setattr(browser, "browser", _FakeBrowser(calls, '{"items": [{"t": "J"}]}', fails=False))
     text = ("title: J\nsuffix: j\nsource: https://b.test/api\nfetch: {backend: browser}\n"

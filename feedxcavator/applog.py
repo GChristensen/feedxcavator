@@ -1,4 +1,4 @@
-"""The application log (LOG-1 to LOG-4), stored in LogEntry."""
+"""The application log, stored in LogEntry."""
 
 from __future__ import annotations
 
@@ -60,7 +60,7 @@ def write(*args):
 
 
 def read_entries(n: int, from_: int | None = None) -> list[dict]:
-    """LOG-3: newest first. With `from_`, entries numbered from `from_` down."""
+    """Newest first. With `from_`, entries numbered from `from_` down."""
     from feedxcavator.models import LogEntry
 
     query = LogEntry.objects.order_by("-id")
@@ -79,7 +79,7 @@ def clear():
 
 
 def install_excepthooks():
-    """LOG-4: uncaught exceptions on any thread go to stderr and the application log."""
+    """Uncaught exceptions on any thread go to stderr and the application log."""
 
     def hook(exc_type, exc, tb):
         traceback.print_exception(exc_type, exc, tb, file=sys.__stderr__)
@@ -94,7 +94,7 @@ def install_excepthooks():
 
 
 class ContextStdout:
-    """A stdout that diverts writes into a per-context buffer when one is set (UC2-20)."""
+    """A stdout that diverts writes into a per-context buffer when one is set, for scratch runs."""
 
     def __init__(self, original):
         self._original = original

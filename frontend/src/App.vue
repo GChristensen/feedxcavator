@@ -14,7 +14,7 @@ import ApiTab from './components/ApiTab.vue'
 import ManualTab from './components/ManualTab.vue'
 import QuickOpen from './components/QuickOpen.vue'
 
-// UI2-2: Workspace, Schedules, Runs, Log, Settings, API, plus Tasks (TSK2-1) and Word filters (STO2-9)
+// The tabs: Workspace, Schedules, Runs, Log, Settings, API, Tasks and Word filters
 const TABS = [
   { id: 'workspace', title: 'Workspace' },
   { id: 'tasks', title: 'Tasks' },
@@ -30,17 +30,17 @@ const TABS = [
 
 function tabFromHash() {
   const id = window.location.hash.replace(/^#/, '').split('/')[0]
-  return TABS.some((t) => t.id === id) ? id : 'workspace' // UI-2
+  return TABS.some((t) => t.id === id) ? id : 'workspace' // an unknown tab opens the Workspace
 }
 
 const DEMO = !!import.meta.env.VITE_DEMO
 const current = ref(tabFromHash())
-const visited = reactive(new Set([current.value])) // UI-1: a tab is built when first shown
+const visited = reactive(new Set([current.value])) // a tab is built when first shown
 const workspace = ref(null)
 const wordfilters = ref(null)
 const quickOpen = ref(false)
 
-// UI-3: the settings and the task list are fetched on load and kept for later use
+// the settings and the task list are fetched on load and kept for later use
 const store = reactive({
   settings: {},
   tasks: [],

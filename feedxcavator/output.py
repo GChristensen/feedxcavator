@@ -1,4 +1,4 @@
-"""Feed output: RSS 2.0, Atom, JSON Feed 1.1 and plain JSON (PORT-REQUIREMENTS section 13)."""
+"""Feed output: RSS 2.0, Atom, JSON Feed 1.1 and plain JSON."""
 
 from __future__ import annotations
 
@@ -25,7 +25,7 @@ def get_websub_url() -> str:
 
 
 def get_feed_url(feed) -> str:
-    """The public URL of a feed (EX-12)."""
+    """The public URL of a feed."""
     if feed.get("suffix"):
         return f"{conf.websub_host()}/feed/{feed['suffix']}"
     return f"{conf.websub_host()}/feed/uuid:{feed.get('id')}"
@@ -53,7 +53,7 @@ def _categories(headline) -> list[str]:
 
 
 def _dates(headlines, now):
-    """OUT-2: `published` when present, otherwise decreasing by 5 seconds from 6 seconds before now."""
+    """Item dates: `published` when present, otherwise decreasing by 5 seconds from 6 seconds before now."""
     dates = []
     for index, headline in enumerate(headlines):
         published = parse_date(headline.get("published")) if headline.get("published") else None
@@ -176,7 +176,7 @@ def generate_atom(feed, headlines) -> str:
 
 
 def generate_json_feed(feed, headlines) -> str:
-    """OUT-3: JSON Feed 1.1."""
+    """JSON Feed 1.1."""
     document = {
         "version": "https://jsonfeed.org/version/1.1",
         "title": feed.get("title"),
@@ -221,7 +221,7 @@ def serializable(headline: dict) -> dict:
 
 
 def generate_json(feed, headlines) -> str:
-    """OUT-4: the headlines with all their fields except `guid` and `html`."""
+    """Plain JSON: the headlines with all their fields except `guid` and `html`."""
     return json.dumps([serializable(h) for h in headlines], ensure_ascii=False, default=_json_default)
 
 
@@ -237,7 +237,7 @@ def produce_feed_output(feed, headlines) -> dict:
     output = feed.get("output")
     limit = output.get("limit") if isinstance(output, dict) else None
     if limit is not None:
-        headlines = headlines[:limit]  # OUT-5
+        headlines = headlines[:limit]
     fmt = output_format(feed)
     generator = {
         "rss": generate_rss, "atom": generate_atom, "json-feed": generate_json_feed, "json": generate_json,

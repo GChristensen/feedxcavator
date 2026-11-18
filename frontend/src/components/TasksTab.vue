@@ -1,6 +1,6 @@
 <script setup>
-// The Tasks tab (TSK2-1 to TSK2-7): a table of tasks; edits go to tasks.yaml, preserving its comments.
-// Tasks named only in the `tasks` field of feeds (TSK2-2) are listed too; editing one declares it.
+// The Tasks tab: a table of tasks; edits go to tasks.yaml, preserving its comments.
+// Tasks named only in the `tasks` field of feeds are listed too; editing one declares it.
 import { computed, inject, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import { api, describeError } from '../api'
 import { formatTime } from '../time'

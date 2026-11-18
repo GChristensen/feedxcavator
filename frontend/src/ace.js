@@ -1,4 +1,4 @@
-// Ace setup (D-5, UI2-3): the current 1.x release with YAML, Python, Hy, XML, JSON, JavaScript, CSS and HTML modes.
+// Ace setup: the current 1.x release with YAML, Python, Hy, XML, JSON, JavaScript, CSS and HTML modes.
 import ace from 'ace-builds/src-noconflict/ace'
 import 'ace-builds/src-noconflict/theme-monokai'
 import 'ace-builds/src-noconflict/mode-yaml'
@@ -33,7 +33,7 @@ export const MODES = {
 export function createSession(content, lang) {
   const session = ace.createEditSession(content || '', MODES[lang] || MODES.text)
   session.setUseWorker(false)
-  session.setTabSize(lang === 'python' || lang === 'javascript' ? 4 : 2) // UI-4: soft tabs
+  session.setTabSize(lang === 'python' || lang === 'javascript' ? 4 : 2) // soft tabs
   session.setUseSoftTabs(true)
   session.setUndoManager(new ace.UndoManager())
   return session

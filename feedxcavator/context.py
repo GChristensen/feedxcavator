@@ -1,4 +1,4 @@
-"""Ambient per-request and per-job state, held in contextvars (EX-5, FT2-1)."""
+"""Ambient per-request and per-job state, held in contextvars."""
 
 from __future__ import annotations
 
@@ -18,7 +18,7 @@ _fetch_state: ContextVar = ContextVar("fetch_state")
 
 
 class JobCancelled(Exception):
-    """Raised inside a feed job whose task run has timed out (TSK2-7)."""
+    """Raised inside a feed job whose task run has timed out."""
 
 
 class FetchState:

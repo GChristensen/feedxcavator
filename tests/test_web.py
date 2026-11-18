@@ -60,27 +60,27 @@ def test_feed_routes(http, ws, client):
     }, startup=True)
     response = client.get("/feed/live")
     assert response.status_code == 200 and response["Content-Type"] == "application/rss+xml"
-    assert response["Cache-Control"] == "no-cache" and b"<title>Live</title>" in response.content  # EX-11
+    assert response["Cache-Control"] == "no-cache" and b"<title>Live</title>" in response.content
     assert client.get(f"/feed/uuid:{'c' * 32}").status_code == 200  # only for feeds that set an id
     assert client.get("/feed/uuid:task").status_code == 404
     assert client.get("/feed/empty").status_code == 204
     assert client.get("/feed/unknown").status_code == 404
-    assert client.get("/feed/off").status_code == 404  # FD2-5
+    assert client.get("/feed/off").status_code == 404  # a disabled feed
 
     requests_before = len(http.requests)
     assert client.get("/feed/task").status_code == 204  # nothing stored yet
     storage.store_feed_output(registry.feeds["task"].key, "<rss>stored</rss>", "application/rss+xml", 1)
     stored = client.get("/feed/task")
-    assert stored.content == b"<rss>stored</rss>" and len(http.requests) == requests_before  # 17.2: never live
+    assert stored.content == b"<rss>stored</rss>" and len(http.requests) == requests_before  # a feed with tasks is never extracted live
 
-    assert client.get("/feed/broken").status_code == 503  # UC2-8
+    assert client.get("/feed/broken").status_code == 503  # a failed feed
     storage.store_feed_output(registry.feeds["broken"].key, "last good", "application/rss+xml", 1)
     assert client.get("/feed/broken").content == b"last good"
 
 
 def test_images(client):
     data = bytes(range(256)) * 4
-    assert client.post("/api/images/save", data=data, content_type="image/png").status_code == 403  # AUTH2-4
+    assert client.post("/api/images/save", data=data, content_type="image/png").status_code == 403  # needs the API token
     secret = token(client)
     saved = client.post("/api/images/save", data=data, content_type="image/png", headers={"x-feedxcavator-auth": secret})
     assert saved.status_code == 200
@@ -110,7 +110,7 @@ def test_images(client):
     conf.config["x-accel"] = "/protected-blobs/"
     try:
         accel = client.get(url)
-        assert accel["X-Accel-Redirect"].startswith("/protected-blobs/") and accel.content == b""  # API2-4
+        assert accel["X-Accel-Redirect"].startswith("/protected-blobs/") and accel.content == b""  # served by nginx
     finally:
         conf.config["x-accel"] = None
 
@@ -129,20 +129,20 @@ def whole(request):
 def private(request):
     return redirect_to("https://e.test/there")
 """, "handlers/hy_one.hy": '(defhandler ^:auth hy-secret [name] (html-page (+ "hi " name)))\n'}, startup=True)
-    assert client.get("/handler/sum?a=2&b=3").content == b"5"  # HND-2
+    assert client.get("/handler/sum?a=2&b=3").content == b"5"  # parameters by name
     assert client.post("/handler/sum", {"a": "4", "b": "5"}).content == b"9"  # every method, form parameters
-    assert client.put("/handler/whole?q=x").json() == {"method": "PUT", "q": "x", "source": "whole"}  # HND-5
+    assert client.put("/handler/whole?q=x").json() == {"method": "PUT", "q": "x", "source": "whole"}  # the logging source is the handler name
     assert client.get("/handler/nope").status_code == 404
-    assert client.get("/handler/private").status_code == 403  # HND-4
+    assert client.get("/handler/private").status_code == 403  # needs the API token
     secret = token(client)
     allowed = client.get("/handler/private", headers={"x-feedxcavator-auth": secret})
-    assert allowed.status_code == 302 and allowed["Location"] == "https://e.test/there"  # 17.11
+    assert allowed.status_code == 302 and allowed["Location"] == "https://e.test/there"  # redirect_to answers 302
     assert client.get("/handler/hy-secret?name=you", headers={"x-feedxcavator-auth": secret}).content == b"hi you"
     assert client.get("/handler/private", headers={"x-feedxcavator-auth": "wrong"}).status_code == 403
-    assert ApiToken.objects.get().token_hash != secret  # STO2-14
+    assert ApiToken.objects.get().token_hash != secret  # only the hash is stored
 
     ws({"handlers/h.py": "@handler('sum')\ndef total(a, b):\n    return 'x'\nraise RuntimeError('broken')\n"})
-    assert client.get("/handler/sum?a=1&b=2").status_code == 503  # UC2-10
+    assert client.get("/handler/sum?a=1&b=2").status_code == 503  # its file failed
     assert client.get("/handler/hy-secret?name=x", headers={"x-feedxcavator-auth": secret}).status_code == 200
 
 
@@ -150,7 +150,7 @@ def test_redirect_and_forward(http, ws, client):
     ws({}, startup=True)
     target = "https://e.test/a/b?x=1&y=2"
     response = client.get(f"/redirect/abc123/{quote(target, safe='')}")
-    assert response.status_code == 302 and response["Location"] == target  # CFG-6: encoded slashes
+    assert response.status_code == 302 and response["Location"] == target  # encoded slashes
     encoded = base64.urlsafe_b64encode(target.encode()).decode().rstrip("=")
     assert client.get(f"/redirect-b64/abc/{encoded}")["Location"] == target
     assert client.get("/redirect/abc/javascript%3Aalert(1)").status_code == 404
@@ -165,7 +165,7 @@ def test_redirect_and_forward(http, ws, client):
     upstream = f"{http.url}/media"
     forwarded = client.get(f"/forward/r4nd/?url={quote(upstream, safe='')}&referer={quote('https://ref.test/')}")
     assert forwarded.status_code == 200 and forwarded.content == b"media-bytes"
-    assert forwarded["Content-Type"] == "video/mp4" and forwarded["X-Seen-Referer"] == "https://ref.test/"  # API-32
+    assert forwarded["Content-Type"] == "video/mp4" and forwarded["X-Seen-Referer"] == "https://ref.test/"
     data = base64.urlsafe_b64encode(f"{upstream};;https://b64.test/".encode()).decode().rstrip("=")
     assert client.get(f"/forward-b64/{data}")["X-Seen-Referer"] == "https://b64.test/"
 
@@ -179,12 +179,12 @@ def test_redirect_and_forward(http, ws, client):
 
 def test_backend_websub_and_wordfilter_routes(ws, client):
     ws({"feeds/f/feed.yaml": "source: https://e.test\nselectors: {item: p}\n"}, startup=True)
-    assert client.get("/backend/run/news").content == b"news enqueued"  # TSK-8
+    assert client.get("/backend/run/news").content == b"news enqueued"
     assert client.get("/backend/service-task").content == b"OK"
     assert client.get("/backend/reschedule").content == b"OK"
     assert list(QueueItem.objects.values_list("kind", flat=True)) == ["task", "service-task", "reschedule"]
 
-    assert client.get("/websub").status_code == 405  # 17.8
+    assert client.get("/websub").status_code == 405
     assert client.post("/websub", {"hub.mode": "subscribe", "hub.topic": "http://feeds.test/feed/zzz",
                                    "hub.callback": "http://127.0.0.1:9/cb"}).status_code == 404
     assert client.post("/websub", {"hub.mode": "subscribe", "hub.topic": "http://feeds.test/feed/f",
@@ -202,15 +202,15 @@ def test_backend_websub_and_wordfilter_routes(ws, client):
     secret = token(client)
     assert wf("list", auth=False).status_code == 403
     assert wf("list").json() == []
-    assert wf("add-regex", {}).status_code == 404  # API-40
+    assert wf("add-regex", {}).status_code == 404  # an unknown filter
     assert wf("add-regex", {"regex": "foo.*bar"}).status_code == 204
     assert wf("add-regex", {"word-filter": "other", "regex": "x+"}).status_code == 204
     assert wf("list").json() == ["default", "other"]
-    assert wf("list-words").json() == ["foo.*bar"]  # WF-2
+    assert wf("list-words").json() == ["foo.*bar"]  # regexes as their source text
     assert wf("list-words", {"word-filter": "missing"}).status_code == 404
     assert wf("remove-regex", {"regex": "foo.*bar"}).status_code == 204
     assert WordFilterEntry.objects.filter(filter__name="default").count() == 0
-    assert filters.matches_filter("Some FOOD", ["foo"]) and not filters.matches_filter("bar", ["foo"])  # WF-1
+    assert filters.matches_filter("Some FOOD", ["foo"]) and not filters.matches_filter("bar", ["foo"])  # case-insensitive containment
 
 
 def test_authentication(ws, client):
@@ -218,10 +218,10 @@ def test_authentication(ws, client):
     conf.config["authentication"] = True
     try:
         call_command("setpassword", user="user", password="correct horse", verbosity=0)
-        assert get_user_model().objects.get().check_password("correct horse")  # AUTH2-1
+        assert get_user_model().objects.get().check_password("correct horse")
         for path in ("/console", "/backend/run/t", "/backend/reschedule"):
             response = client.get(path)
-            assert response.status_code == 302 and response["Location"] == f"/login?next={quote(path)}"  # AUTH-5
+            assert response.status_code == 302 and response["Location"] == f"/login?next={quote(path)}"
         assert client.get(f"{API}/tree").status_code == 401
         for path in ("/feed/f", "/image/x", "/handler/x", "/login"):
             assert client.get(path).status_code in (200, 204, 404)
@@ -231,7 +231,7 @@ def test_authentication(ws, client):
         ok = client.post("/login", {"username": "user", "password": "correct horse", "next": "/console#log"})
         assert ok.status_code == 302 and ok["Location"] == "/console#log"
         cookie = ok.cookies["feedxcavator_sessionid"]
-        assert cookie["httponly"] and cookie["samesite"] == "Strict"  # AUTH2-2
+        assert cookie["httponly"] and cookie["samesite"] == "Strict"
         assert client.get(f"{API}/tree").status_code == 200
         assert client.get("/backend/run/t").content == b"t enqueued"
         assert client.post("/login", {"username": "user", "password": "correct horse",
@@ -255,12 +255,12 @@ def test_csrf_protects_console_api(ws):
     ws({}, startup=True)
     strict = Client(enforce_csrf_checks=True)
     assert strict.get(f"{API}/tree").status_code == 200
-    assert strict.post(f"{API}/reload").status_code == 403  # AUTH2-3
+    assert strict.post(f"{API}/reload").status_code == 403  # no CSRF token
     strict.get("/console")  # sets the CSRF cookie
     csrf = strict.cookies["feedxcavator_csrftoken"].value
     assert strict.post(f"{API}/reload", headers={"X-CSRFToken": csrf}).status_code == 200
     assert strict.post("/websub", {"hub.mode": "nonsense"}).status_code == 400  # public routes are exempt
-    assert strict.get(f"{API}/log").status_code == 200 and strict.delete(f"{API}/log").status_code == 403  # 17.10
+    assert strict.get(f"{API}/log").status_code == 200 and strict.delete(f"{API}/log").status_code == 403  # deleting the log needs the CSRF token
 
 
 def test_console_api_files_and_feeds(http, ws, client):
@@ -280,31 +280,31 @@ def test_console_api_files_and_feeds(http, ws, client):
 
     yaml_text = f"title: Cards\nsuffix: cards\nsource: {http.url}/list\n"
     feed_id = "cards"  # the suffix is the identity
-    suggestion = post(client, "/feed/suggest", {"path": created["path"], "yaml": yaml_text}).json()  # AUTO-2
+    suggestion = post(client, "/feed/suggest", {"path": created["path"], "yaml": yaml_text}).json()
     assert suggestion["selectors"]["item"].endswith("div.card") and suggestion["yaml"].startswith("selectors:\n")
     assert (ws.root / created["path"]).read_text().count("Cards") == 0  # nothing is saved
 
     full = yaml_text + suggestion["yaml"]
-    tested = post(client, "/feed/test", {"path": created["path"], "yaml": full}).json()  # API-6
+    tested = post(client, "/feed/test", {"path": created["path"], "yaml": full}).json()
     assert tested["count"] == 4 and tested["content_type"] == "application/rss+xml"
     assert "\n    <item>\n      <title>Headline number 0 here</title>" in tested["output"]  # pretty-printed
 
     invalid = put(client, created["path"], full + "output: edn\n")
-    assert invalid.status_code == 400 and invalid.json()["diagnostics"][0]["line"] == full.count("\n") + 1  # FD2-4
+    assert invalid.status_code == 400 and invalid.json()["diagnostics"][0]["line"] == full.count("\n") + 1  # the line of the error
     assert "Cards" not in (ws.root / created["path"]).read_text()
 
     saved = put(client, created["path"], full, base_mtime=text["mtime"]).json()
-    assert saved["load"]["ok"] and saved["feed"]["title"] == "Cards"  # UI2-11
-    assert (ws.root / created["path"]).read_text() == full  # FD2-1: verbatim
+    assert saved["load"]["ok"] and saved["feed"]["title"] == "Cards"  # the result of the reload
+    assert (ws.root / created["path"]).read_text() == full  # stored verbatim
     stale = put(client, created["path"], full + "#x\n", base_mtime=text["mtime"])
-    assert stale.status_code == 409  # UI2-10: changed on disk since it was opened
+    assert stale.status_code == 409  # changed on disk since it was opened
     assert put(client, created["path"], full + "#x\n", base_mtime=text["mtime"], force=True).status_code == 200
     assert client.get(f"{API}/feed/url", {"key": feed_id}).json() == {"url": "http://feeds.test/feed/cards"}
 
     code = put(client, "feeds/news/local/untitled-feed/extract.py",
                "@extractor('cards-x')\ndef cards(feed):\n    return [{'title': shout('x'), 'link': feed.source}]\n")
     assert code.json()["load"]["ok"]
-    assert post(client, "/feed/test", {"path": created["path"], "yaml": yaml_text}).json()["count"] == 1  # UC2-14
+    assert post(client, "/feed/test", {"path": created["path"], "yaml": yaml_text}).json()["count"] == 1  # the only extractor in the directory is used
     broken = put(client, "feeds/news/local/untitled-feed/extract.py", "def oops(:\n").json()
     assert not broken["load"]["ok"] and broken["file_errors"][0]["line"] == 1
     assert broken["feed"]["status"] == "error"
@@ -314,7 +314,7 @@ def test_console_api_files_and_feeds(http, ws, client):
     local = feeds_dir["children"][0]["children"][0]
     node = next(n for n in local["children"] if n["name"] == "untitled-feed")
     assert node["type"] == "feed" and node["feed"]["title"] == "Cards" and node["feed"]["status"] == "error"
-    assert [c["name"] for c in node["children"]] == ["extract.py"]  # UI2-7: code files are the children
+    assert [c["name"] for c in node["children"]] == ["extract.py"]  # code files are the children
     assert "feeds/news/local/untitled-feed/extract.py" in tree["errors"]
 
     moved = post(client, "/file/move", {"src": "feeds/news/local/untitled-feed", "dst": "feeds/cards"}).json()
@@ -327,7 +327,7 @@ def test_console_api_files_and_feeds(http, ws, client):
     storage.store_feed_output(feed_id, "x", "text/plain")
     Subscription.objects.create(feed_id=feed_id, topic="t", callback="c", created_at="2024-01-01T00:00:00Z")
     assert client.delete(f"{API}/file?path=feeds/cards").status_code == 200
-    assert "cards" not in workspace.get_registry().feeds and Subscription.objects.count() == 0  # WS-9
+    assert "cards" not in workspace.get_registry().feeds and Subscription.objects.count() == 0  # the subscription goes with the feed
     assert storage.fetch_feed_output(feed_id) is None
 
 
@@ -340,14 +340,14 @@ def test_console_api_tasks_schedules_and_misc(ws, client):
     }, startup=True)
     tasks = {t["name"]: t for t in client.get(f"{API}/tasks").json()}
     assert tasks["news"]["declared"] is False and tasks["morning"]["feeds"] == 1
-    assert client.get(f"{API}/tasks/feeds", {"task": "morning"}).json()[0]["title"] == "Alpha"  # TSK-10
+    assert client.get(f"{API}/tasks/feeds", {"task": "morning"}).json()[0]["title"] == "Alpha"
     assert post(client, "/tasks/run", {"task": "morning"}).json() == {"enqueued": "morning"}
     assert workspace.get_registry().feeds["a"].key == "a"
     assert post(client, "/feed/run-tasks", {"key": "a"}).json() == {"enqueued": ["news"]}
     assert QueueItem.objects.count() == 2
 
     rows = client.get(f"{API}/schedules").json()["schedules"]
-    assert rows[0]["task"] == "news" and len(rows[0]["next"]) == 1 and "12:00" in rows[0]["description"]  # UI2-8
+    assert rows[0]["task"] == "news" and len(rows[0]["next"]) == 1 and "12:00" in rows[0]["description"]
     assert post(client, "/schedules/save", {"index": 0, "cron": "30 8 * * mon", "enabled": False}).status_code == 200
     assert post(client, "/schedules/save", {"task": "morning", "cron": "0 6 15 * *",
                                             "timezone": "Europe/Kyiv"}).status_code == 200
@@ -364,13 +364,13 @@ def test_console_api_tasks_schedules_and_misc(ws, client):
     assert post(client, "/scratch/run", {"path": "scratch.py", "content": "print(6 * 7)"}).json()["output"] == "42\n"
     assert client.get(f"{API}/file/validate").status_code == 405
     diagnostics = post(client, "/file/validate", {"path": "tasks.yaml", "content": "tasks:\n  x: {bogus: 1}\n"}).json()
-    assert diagnostics["diagnostics"][0]["line"] == 2  # UI2-5
+    assert diagnostics["diagnostics"][0]["line"] == 2
     schemas = client.get(f"{API}/schemas").json()
     assert "selectors" in schemas["feed"]["properties"] and "tasks" in schemas["tasks"]["properties"]
     reference = client.get(f"{API}/reference").json()["sections"]
     fetching = next(s for s in reference if s["category"] == "Fetching")
     entry = next(e for e in fetching["entries"] if e["name"] == "fetch_url")
-    assert entry["hy"] == "fetch-url" and "Never raises" in entry["doc"]  # UC2-21
+    assert entry["hy"] == "fetch-url" and "Never raises" in entry["doc"]  # from the docstring
     browser_entries = next(s for s in reference if s["category"] == "Browser")["entries"]
     assert any(e["name"].startswith("page.wait_for(") for e in browser_entries)
     assert [e["name"] for e in browser_entries if not e["doc"]] == []  # every public browser method is documented
@@ -383,7 +383,7 @@ def test_console_api_tasks_schedules_and_misc(ws, client):
     for n in range(5):
         applog.write("warning" if n % 2 else "info", f"entry {n}")
     newest = client.get(f"{API}/log", {"n": 3}).json()
-    assert [e["message"] for e in newest] == ["entry 4", "entry 3", "entry 2"]  # LOG-3, exactly n (17.14)
+    assert [e["message"] for e in newest] == ["entry 4", "entry 3", "entry 2"]  # newest first, exactly n
     older = client.get(f"{API}/log", {"n": 2, "from": newest[-1]["number"] - 1}).json()
     assert [e["message"] for e in older] == ["entry 1", "entry 0"]
     assert client.delete(f"{API}/log").status_code == 200 and client.get(f"{API}/log").json() == []
@@ -393,7 +393,7 @@ def test_console_api_tasks_schedules_and_misc(ws, client):
     client.put(f"{API}/settings", data=json.dumps({"subscription_url": "https://reader.test/?url="}),
                content_type="application/json")
     assert client.get(f"{API}/settings").json()["subscription_url"] == "https://reader.test/?url="
-    assert post(client, "/restart").status_code == 409  # LFC-2
+    assert post(client, "/restart").status_code == 409  # not supervised
     assert client.get(f"{API}/runs").json() == []
 
 
@@ -425,7 +425,7 @@ def test_backup_and_restore(ws, client):
     assert backup["Content-Type"] == "application/zip"
     archive = zipfile.ZipFile(io.BytesIO(backup.content))
     assert {"wordfilters.json", "kvobjects.json", "subscriptions.json", "settings.json", "schedulestate.json",
-            "workspace.tar.gz"} <= set(archive.namelist())  # STO2-15
+            "workspace.tar.gz"} <= set(archive.namelist())
 
     WordFilterEntry.objects.all().delete()
     KVObject.objects.all().delete()
@@ -469,15 +469,15 @@ def test_import_3_0_backup(tmp_path, ws):
     report = out.getvalue()
     converted = (ws.root / "feeds/news/local/old-feed/feed.yaml").read_text()
     data = __import__("yaml").safe_load(converted)
-    assert "id" not in data and data["suffix"] == "old-feed" and "# c" in converted  # MIG-1
+    assert "id" not in data and data["suffix"] == "old-feed" and "# c" in converted
     assert data["tasks"] == ["news"] and data["websub"] == {"enabled": True, "partition": 100}
     assert data["fetch"] == {"charset": "windows-1251", "proxy": "default"} and data["pages"]["path"] == "/?page={n}"
     assert not {"task", "realtime", "partition", "charset", "proxy", "timeout", "group"} & set(data)
-    assert "native Enlive selector in 'title'" in report and "output: edn is no longer supported" in report  # MIG-2
+    assert "native Enlive selector in 'title'" in report and "output: edn is no longer supported" in report
     assert (ws.root / "legacy/extractors.clj").read_text() == "(defextractor custom [feed] [])"
     schedules = __import__("yaml").safe_load((ws.root / "schedules.yaml").read_text())["schedules"]
     assert schedules == [{"task": "news", "cron": "0 12 * * *"}, {"task": "digest", "cron": "30 8 * * mon"},
-                         {"task": "report", "cron": "0 6 15 * *"}]  # MIG-3
+                         {"task": "report", "cron": "0 6 15 * *"}]
     tasks = __import__("yaml").safe_load((ws.root / "tasks.yaml").read_text())["tasks"]
     assert tasks == {"morning-feeds": {"run": ["news", "articles"], "then": ["aggregate", "remind-me"]}}
     assert sorted(WordFilterEntry.objects.values_list("kind", "value")) == [("regex", "ads?"), ("word", "spam")]

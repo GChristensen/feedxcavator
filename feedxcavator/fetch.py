@@ -1,4 +1,4 @@
-"""HTTP fetching on curl_cffi (FT-1 to FT-7, FT2-1 to FT2-4)."""
+"""HTTP fetching on curl_cffi."""
 
 from __future__ import annotations
 
@@ -25,10 +25,10 @@ DEFAULT_IMPERSONATE = "chrome"
 # an MTProto proxy (a Telegram proxy, `secret` instead of user and password) serves only Telegram calls
 MTPROTO = "mtproto"
 
-# name -> {host, port, user, password, scheme, secret}; replaced by the workspace loader on every load (FT-7)
+# name -> {host, port, user, password, scheme, secret}; replaced by the workspace loader on every load
 proxy_resolver = lambda name: None  # noqa: E731
 
-# host -> {cookies, user_agent, impersonate}: sessions handed over by the browser (BRW-5)
+# host -> {cookies, user_agent, impersonate}: sessions handed over by the browser
 _host_sessions: dict[str, dict] = {}
 _host_lock = threading.Lock()
 _sleep = time.sleep
@@ -205,8 +205,8 @@ def _random_ms(n) -> int:
 
 
 def retry_delay_ms(backoff: int, requested: int | None) -> int:
-    """Equal jitter: half of the backoff plus a random part of the other half (FT-4). A requested delay
-    is never shortened, only extended by up to 10% (FT-5)."""
+    """Equal jitter: half of the backoff plus a random part of the other half. A requested delay
+    is never shortened, only extended by up to 10%."""
     half = backoff // 2
     jittered = half + _random_ms(backoff - half)
     if requested is not None:
@@ -237,7 +237,7 @@ def _wait(ms: int):
 
 
 def adopt_browser_session(url: str, cookies: dict, user_agent: str | None, impersonate: str | None = None):
-    """BRW-5: later fetches for the host reuse the cookies and user agent of the browser."""
+    """Later fetches for the host reuse the cookies and user agent of the browser."""
     host = urlsplit(url).hostname
     if host and cookies:
         with _host_lock:

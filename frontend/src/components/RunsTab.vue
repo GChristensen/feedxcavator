@@ -1,5 +1,5 @@
 <script setup>
-// The Runs tab (UI2-9): recent task runs, expandable to their feed runs.
+// The Runs tab: recent task runs, expandable to their feed runs.
 import { onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { api, describeError } from '../api'
 import { formatTime } from '../time'

@@ -1,6 +1,6 @@
 <script setup>
 // The Word filters tab: the filters on the left, the entries of the selected one on the right, one per line.
-// A line written as /expr/ is a regular expression, any other line a plain word (WF-1, WF-2).
+// A line written as /expr/ is a regular expression, any other line a plain word.
 import { markRaw, onMounted, ref, shallowRef, watch } from 'vue'
 import { api, describeError } from '../api'
 import { createSession } from '../ace'
