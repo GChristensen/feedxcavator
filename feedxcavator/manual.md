@@ -619,6 +619,92 @@ the `fetch.proxy` of the calling feed too (or their own `proxy` argument); when 
 through the proxy named `default` only if `telegram.default-proxy` is true. The `/forward` links made by
 `forward_url(url, referer, proxy="name")` fetch through the named proxy. WebSub callbacks never use a proxy.
 
+## Images and media
+
+A feed reader loads the images of an item itself, from the reader's computer. That fails when the image exists
+only inside the server (a browser screenshot, a Telegram photo), or when the site refuses requests that do not
+come from its own pages. Feedxcavator can store the image and serve it, or fetch it on the reader's behalf.
+
+### Saving and serving images
+
+`store_image(data, content_type="image/jpeg", source_url="")` (`store-image` in Hy) stores bytes and returns the
+link they are served at, `<host>/image/<id>`. Put the link in the `image` field of a headline, or in an
+`<img>` tag of its summary:
+
+```python
+@extractor("chart-extractor")
+def chart_extractor(feed):
+    with browser() as b:
+        page = b.open(feed.source, wait_for="#chart")
+        png = page.screenshot("#chart")
+    return [{"title": "Today's chart", "link": feed.source,
+             "image": store_image(png, "image/png", feed.source)}]
+```
+
+The same applies to an image that has to be fetched with cookies or a token once:
+
+```python
+data = fetch_url(url, headers={"Authorization": f"Bearer {TOKEN}"}, as_="bytes")
+if data:
+    headline = assoc(headline, "image", store_image(data, "image/jpeg", url))
+```
+
+- Each call returns a new link, but identical content is kept on disk only once. `source_url` is only recorded.
+- `/image/<id>` is public, so readers open it without logging in. It answers range requests and tells readers to
+  cache the image for a year, since the content behind a link never changes.
+- The link starts with the address of the current request, or with `hostname` from `config.yml` during
+  background extraction (see [Hostnames](#hostnames-a-reader-on-the-same-machine)).
+- Stored images are deleted after `service-task.max-age-days` (2 days by default, see
+  [Maintenance](#maintenance)), and the Settings tab can purge them all. Old items then show broken images, so
+  keep the age above the time your reader keeps items unread.
+- With `x-accel` set in `config.yml`, nginx sends the image files itself (`deploy/nginx.conf`, HTTPS in the
+  README).
+
+External programs can store images too: `POST /api/images/save` with the image as the request body, its type in
+`Content-Type`, and the [API token](#the-api-token) in the `x-feedxcavator-auth` header. The answer is the id as
+plain text; the image is then at `/image/<id>`.
+
+```
+curl -X POST -H "x-feedxcavator-auth: $TOKEN" -H "Content-Type: image/png" \
+     --data-binary @chart.png http://localhost:10000/api/images/save
+```
+
+### Forwarding images with a referer and a proxy
+
+Many sites refuse to serve images, and especially video, to a request whose `Referer` is not one of their pages,
+and some sites are reachable only through a proxy. `forward_url(url, referer, https=False, proxy=None)`
+(`forward-url` in Hy) returns a link to this server that fetches `url` when it is opened, sends `referer` as the
+`Referer` header, and passes the answer to the reader:
+
+```python
+def forwarded_image(headline):
+    if headline.get("image"):
+        headline = assoc(headline, "image", forward_url(headline["image"], headline["link"]))
+    return headline
+```
+
+```hy
+(defn forwarded-image [headline]
+  (if (:image headline)
+      (assoc headline "image" (forward-url (:image headline) "https://example.com/" :proxy "work"))
+      headline))
+```
+
+Name the function in `transform` of `feed.yaml` (see [Transform](#transform)) to apply it to every headline.
+
+- `proxy` names a proxy from `proxies` in `config.yml` (see [Proxies](#proxies)). Without it the fetch connects
+  directly; the feed's own `fetch.proxy` is not applied, because the link is opened outside the feed.
+- `https=True` starts the link with `secure-hostname` instead of the current address, for readers that open
+  only HTTPS links.
+- Nothing is stored: the image is fetched again every time the link is opened, without retries. The `Range`
+  header of the reader is passed on, so video can be seeked. An upstream failure answers 502 with the reason.
+- The link carries the target and the referer in plain view. `forward_url_b64` takes the same arguments and
+  encodes both in Base64 (`/forward-b64/...`), which keeps them out of sight but not secret.
+- `/forward` links are public, like `/image`, so anyone who has a link can open it.
+
+Forwarding suits large or changing media and sites that must see each request; storing suits images that are
+small, made inside the server, or need credentials to fetch.
+
 ## Browsers
 
 Pages that need JavaScript can be opened in a real browser, either with `fetch.backend: browser` in the feed or

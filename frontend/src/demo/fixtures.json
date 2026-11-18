@@ -64,6 +64,21 @@
    "error": null
   },
   {
+   "path": "browser/x-screenshots",
+   "dir": "feeds/browser/x-screenshots",
+   "id": null,
+   "key": "x-screenshots",
+   "title": "X: Orbital Lab, as pictures",
+   "suffix": "x-screenshots",
+   "enabled": true,
+   "tasks": [],
+   "tags": [
+    "browser"
+   ],
+   "status": "ok",
+   "error": null
+  },
+  {
    "path": "browser/youtube-orbital-lab",
    "dir": "feeds/browser/youtube-orbital-lab",
    "id": null,
@@ -84,6 +99,9 @@
  "files": {
   "feeds/browser/x-orbital-lab/feed.yaml": "title: 'X: Orbital Lab'\nsuffix: x-orbital-lab\n# A fictional profile page (demo/sites/x.html, served by tools/record_demo.py). Its posts are drawn by a script\n# and more load on scrolling, as on x.com, so x.py reads it in Camoufox. For a real profile, use its address and\n# a browser profile signed in to X: params: {profile: x}, then ./firefox-profile.sh x https://x.com\nsource: https://gchristensen.github.io/feedxcavator/demo/sites/x.html\ntags: [browser]\nextractor: x-profile\nselectors:\n  item: 'article[data-testid=tweet]'\n  title: '[data-testid=tweetText]'\n  summary: '[data-testid=tweetText]'\n  link: 'a[href*=\"/status/\"]'\n  image: '[data-testid=tweetPhoto] img'\n  published: {css: 'time::attr(datetime)', parse: date}\ntasks: [browser]\n",
   "feeds/browser/x-orbital-lab/x.py": "# The simplest browser extractor: open the page in Camoufox, wait for the posts, scroll a little to load\n# more, and read them with the selectors of feed.yaml.\n\n@extractor(\"x-profile\")\ndef x_profile(feed):\n    profile = (feed.params or {}).get(\"profile\", \"default\")\n    with browser(profile=profile) as b:\n        page = b.open(feed.source, wait_for=\"article[data-testid=tweet]\", scroll=2, timeout=60)\n        return page.apply_selectors(feed)\n",
+  "feeds/browser/x-screenshots/feed.yaml": "title: 'X: Orbital Lab, as pictures'\nsuffix: x-screenshots\n# Each post as a screenshot, so quotes, polls and cards look as they do on X. Needs a browser profile signed\n# in to X: ./firefox-profile.sh x https://x.com. Not recorded: the demo shows an output written by hand\n# (frontend/src/demo/handmade/x-screenshots.xml).\nsource: https://x.com/orbital_lab\ntags: [browser]\nextractor: x-screenshots\nparams: {profile: x}\noutput: {limit: 10}",
+  "feeds/browser/x-screenshots/posts.js": "// Runs in the page (load_js(\"posts\")). Marks each post with data-fx so Python can take its screenshot,\n// and returns the post's selector, link, text and time.\n\nfunction main(limit) {\n  const posts = [...document.querySelectorAll('article[data-testid=tweet]')].slice(0, limit)\n  return posts.map((post, i) => {\n    post.dataset.fx = i\n    return {\n      selector: `article[data-fx=\"${i}\"]`,\n      link: post.querySelector('a[href*=\"/status/\"]')?.href,\n      text: post.querySelector('[data-testid=tweetText]')?.innerText || '',\n      published: post.querySelector('time')?.getAttribute('datetime'),\n    }\n  }).filter((post) => post.link)\n}",
+  "feeds/browser/x-screenshots/screenshots.py": "# Posts as pictures: posts.js finds the posts on the page, then each one is screenshotted and kept in the\n# image store (/image/<id>), and the headline shows the picture.\n\nfrom html import escape\n\n# hidden while a shot is taken: the sticky bars that would lie over the post\nHIDE = \"[data-testid=TopNavBar], [data-testid=BottomBar] {visibility: hidden !important}\"\n\n\n@extractor(\"x-screenshots\")\ndef x_screenshots(feed):\n    with browser(profile=feed.params[\"profile\"]) as b:\n        page = b.open(feed.source, wait_for=\"article[data-testid=tweet]\", timeout=60)\n        headlines = []\n        for post in page.evaluate(load_js(\"posts\"), 10):\n            shot = page.screenshot(post[\"selector\"], type=\"jpeg\", quality=85, style=HIDE)\n            image = store_image(shot, \"image/jpeg\", post[\"link\"])\n            headlines.append({\n                \"title\": post[\"text\"][:100] or \"(a post without text)\",\n                \"link\": post[\"link\"],\n                \"published\": post[\"published\"],\n                \"image\": image,\n                \"summary\": f'<p>{escape(post[\"text\"])}</p><img src=\"{image}\">',\n            })\n        return headlines",
   "feeds/browser/youtube-orbital-lab/feed.yaml": "title: 'YouTube: Orbital Lab'\nsuffix: youtube-orbital-lab\n# A fictional channel page (demo/sites/youtube.html, served by tools/record_demo.py) with the markup of a\n# youtube.com/@channel/videos page. Its cards are drawn by a script, so youtube.hy reads it in Camoufox.\nsource: https://gchristensen.github.io/feedxcavator/demo/sites/youtube.html\ntags: [browser]\nextractor: youtube-channel\nselectors:\n  item: ytd-rich-item-renderer\n  title: '#video-title'\n  link: 'a#video-title-link'\n  image: 'img'\n  summary: '#metadata-line'\ntasks: [browser]\n",
   "feeds/browser/youtube-orbital-lab/youtube.hy": ";; The simplest browser extractor in Hy: open the channel in Camoufox, wait for the video cards,\n;; and read them with the selectors of feed.yaml.\n\n(defextractor youtube-channel [feed]\n  (with-browser [b]\n    (-> (.open b (:source feed) :wait-for \"ytd-rich-item-renderer\" :scroll 1 :timeout 60)\n        (.apply-selectors feed))))\n",
   "feeds/news/hacker-news/feed.yaml": "title: 'Hacker News'\nsuffix: hacker-news\nsource: https://news.ycombinator.com/\ntags: [news]\nselectors:\n  item: tr.athing\n  title: .titleline > a\n  link: .titleline > a\n  author: .sitestr\nfilter:\n  - wordfilter: {name: noise, fields: [title]}\n  - limit: 30\ntasks: [news]\n",

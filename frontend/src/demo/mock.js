@@ -1,8 +1,11 @@
 // The backend of the static demo console (npm run build:demo). It answers the console API from fixtures
 // recorded by tools/record_demo.py against a real server, and keeps edits in memory until the page reloads.
+// Feeds that are not recorded get their Test output from handmade/<feed key>.xml, written by hand.
 
 import { ApiError } from '../api'
 import fixtures from './fixtures.json'
+
+const handmade = import.meta.glob('./handmade/*.xml', { query: '?raw', import: 'default', eager: true })
 
 const clone = (value) => JSON.parse(JSON.stringify(value))
 const now = () => Date.now()
@@ -23,6 +26,15 @@ const state = {
   nextRun: Math.max(0, ...fixtures.runs.map((r) => r.id)) + 1,
   nextLog: Math.max(0, ...fixtures.log.map((e) => e.number)) + 1,
   generation: 1,
+}
+
+for (const [file, output] of Object.entries(handmade)) {
+  const key = file.split('/').pop().replace(/\.xml$/, '')
+  const feed = [...state.feeds.values()].find((f) => f.key === key)
+  if (feed) {
+    state.tests[feed.dir + '/feed.yaml'] = { output, content_type: 'application/rss+xml',
+      count: (output.match(/<item>/g) || []).length, error: null, seconds: 6.2 }
+  }
 }
 
 function fail(status, error, extra = {}) {

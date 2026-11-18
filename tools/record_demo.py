@@ -32,6 +32,7 @@ SITES_PORT = 21901
 # where GitHub Pages publishes demo/sites: links to the fictional pages in the fixtures point there
 SITES_PUBLIC = "https://gchristensen.github.io/feedxcavator/demo/sites/"
 OUT = REPO / "frontend" / "src" / "demo" / "fixtures.json"
+HANDMADE = OUT.parent / "handmade"  # <feed key>.xml: a hand-written output for a feed that is not recorded
 EDITABLE = {".yaml", ".yml", ".hy", ".py", ".js", ".txt", ".md", ".json", ".css", ".html"}
 DEMO_WORKSPACE_PATH = "/srv/feedxcavator/workspace"
 WORD_FILTERS = {"noise": "sponsored\n/(?i)^ask hn: who is hiring/\n"}
@@ -133,7 +134,7 @@ def main():
     only = set(args.feeds.split(",")) if args.feeds else None
     tests = dict(old.get("tests", {})) if only else {}
     for feed in feeds:
-        if only and feed["key"] not in only:
+        if only and feed["key"] not in only or (HANDMADE / f"{feed['key']}.xml").exists():
             continue
         path = feed["dir"] + "/feed.yaml"
         yaml = (WORKSPACE / path).read_text(encoding="utf-8")

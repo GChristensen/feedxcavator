@@ -1,0 +1,10 @@
+title: 'X: Orbital Lab, as pictures'
+suffix: x-screenshots
+# Each post as a screenshot, so quotes, polls and cards look as they do on X. Needs a browser profile signed
+# in to X: ./firefox-profile.sh x https://x.com. Not recorded: the demo shows an output written by hand
+# (frontend/src/demo/handmade/x-screenshots.xml).
+source: https://x.com/orbital_lab
+tags: [browser]
+extractor: x-screenshots
+params: {profile: x}
+output: {limit: 10}

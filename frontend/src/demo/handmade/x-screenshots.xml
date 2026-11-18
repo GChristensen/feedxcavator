@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0" xml:base="https://x.com/orbital_lab">
+  <channel>
+    <title>X: Orbital Lab, as pictures</title>
+    <link>https://x.com/orbital_lab</link>
+    <description/>
+    <atom:link href="https://feeds.example.com/feed/x-screenshots" rel="self" type="application/rss+xml"/>
+    <pubDate>Wed, 18 Nov 2026 08:12:40 +0000</pubDate>
+    <lastBuildDate>Wed, 18 Nov 2026 08:12:40 +0000</lastBuildDate>
+    <item>
+      <title>Poll: which Kestrel-2 image should be the lab's new wallpaper?</title>
+      <link>https://x.com/orbital_lab/status/1990417203318842101</link>
+      <pubDate>Wed, 18 Nov 2026 07:05:11 +0000</pubDate>
+      <description>&lt;p&gt;Poll: which Kestrel-2 image should be the lab's new wallpaper?&lt;/p&gt;&lt;img src="https://feeds.example.com/image/3f9c1e7a2b4d4e0f8a61c5d2e7b90a14"&gt;</description>
+      <enclosure length="0" type="image/jpeg" url="https://feeds.example.com/image/3f9c1e7a2b4d4e0f8a61c5d2e7b90a14"/>
+    </item>
+    <item>
+      <title>Quoting @groundstation_eu: they caught our beacon on the first pass. Thank you, Tromsø!</title>
+      <link>https://x.com/orbital_lab/status/1990301877642210455</link>
+      <pubDate>Tue, 17 Nov 2026 22:41:03 +0000</pubDate>
+      <description>&lt;p&gt;Quoting @groundstation_eu: they caught our beacon on the first pass. Thank you, Tromsø!&lt;/p&gt;&lt;img src="https://feeds.example.com/image/a07d5b3e91c24f6e8d2b0c4a6f1e3d58"&gt;</description>
+      <enclosure length="0" type="image/jpeg" url="https://feeds.example.com/image/a07d5b3e91c24f6e8d2b0c4a6f1e3d58"/>
+    </item>
+    <item>
+      <title>Battery temperature over the first 48 hours. The dip at orbit 19 is the eclipse season starting.</title>
+      <link>https://x.com/orbital_lab/status/1990155320977461823</link>
+      <pubDate>Tue, 17 Nov 2026 13:18:47 +0000</pubDate>
+      <description>&lt;p&gt;Battery temperature over the first 48 hours. The dip at orbit 19 is the eclipse season starting.&lt;/p&gt;&lt;img src="https://feeds.example.com/image/c81e2f40d6b94a7c9e35a1b8f02d6c77"&gt;</description>
+      <enclosure length="0" type="image/jpeg" url="https://feeds.example.com/image/c81e2f40d6b94a7c9e35a1b8f02d6c77"/>
+    </item>
+    <item>
+      <title>(a post without text)</title>
+      <link>https://x.com/orbital_lab/status/1989988104523377690</link>
+      <pubDate>Tue, 17 Nov 2026 02:09:30 +0000</pubDate>
+      <description>&lt;p&gt;&lt;/p&gt;&lt;img src="https://feeds.example.com/image/5b2a9d0e7f3c41e6a8b4d1c0e9f27a63"&gt;</description>
+      <enclosure length="0" type="image/jpeg" url="https://feeds.example.com/image/5b2a9d0e7f3c41e6a8b4d1c0e9f27a63"/>
+    </item>
+    <item>
+      <title>Thread: what we got wrong about deployable antennas, and the three fixes that made Kestrel-2's work.</title>
+      <link>https://x.com/orbital_lab/status/1989810465230018874</link>
+      <pubDate>Mon, 16 Nov 2026 14:23:58 +0000</pubDate>
+      <description>&lt;p&gt;Thread: what we got wrong about deployable antennas, and the three fixes that made Kestrel-2's work. 🧵&lt;/p&gt;&lt;img src="https://feeds.example.com/image/e4f0a6c2b8d94153a7e1f9c3d5b2086e"&gt;</description>
+      <enclosure length="0" type="image/jpeg" url="https://feeds.example.com/image/e4f0a6c2b8d94153a7e1f9c3d5b2086e"/>
+    </item>
+    <item>
+      <title>Open lab day is on! Live from the clean room until 16:00.</title>
+      <link>https://x.com/orbital_lab/status/1989652238815544102</link>
+      <pubDate>Mon, 16 Nov 2026 03:47:12 +0000</pubDate>
+      <description>&lt;p&gt;Open lab day is on! Live from the clean room until 16:00.&lt;/p&gt;&lt;img src="https://feeds.example.com/image/91d7c3b5e0a24f8e6c2d4b1a7f9e0c35"&gt;</description>
+      <enclosure length="0" type="image/jpeg" url="https://feeds.example.com/image/91d7c3b5e0a24f8e6c2d4b1a7f9e0c35"/>
+    </item>
+  </channel>
+</rss>
