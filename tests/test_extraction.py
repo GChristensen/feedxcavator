@@ -208,6 +208,11 @@ def test_background_stores_and_publishes(http):
     assert stored["content_type"] == "application/rss+xml" and "Title 3" in stored["output"]
     assert len(received) == 2  # WS-7: parts of 2, the last part first
     assert b"Title 3" in received[0][1] and b"Title 1" not in received[0][1] and b"Title 1" in received[1][1]
+    # dates run over the whole list, not from "now" in each part: Title 3 is older than Title 2
+    import re
+    from email.utils import parsedate_to_datetime
+    dates = [parsedate_to_datetime(d.decode()) for d in re.findall(rb"</link><pubDate>(.*?)</pubDate>", received[1][1] + received[0][1])]
+    assert dates == sorted(dates, reverse=True) and len(set(dates)) == 3
     headers = {k.lower(): v for k, v in received[0][0].items()}
     import hashlib
     import hmac

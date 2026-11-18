@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import time
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from urllib.parse import urljoin
 
 from parsel import Selector
@@ -335,6 +336,10 @@ def publish(feed, headlines, result: dict):
     try:
         partition = options.get("partition")
         if partition:
+            # dates are assigned over the whole list: each part on its own would restart them at "now",
+            # interleaving the parts in readers that order by date
+            now = datetime.now(timezone.utc)
+            headlines = [{**h, "published": date} for h, date in zip(headlines, output._dates(headlines, now))]
             parts = [headlines[i:i + partition] for i in range(0, len(headlines), partition)]
             for part in reversed(parts):
                 time.sleep(1)
