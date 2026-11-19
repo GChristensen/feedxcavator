@@ -42,12 +42,16 @@ Saved as `workspace/feeds/my-first-feed/feed.yaml`, it is served at `http://<hos
 
 ## Installation
 
-Feedxcavator needs Python 3.12 or later. From the installation directory:
+Feedxcavator needs Python 3.12 or later and git. Clone the repository; the clone is the installation directory:
 
 ```
+git clone https://github.com/GChristensen/feedxcavator.git
+cd feedxcavator
 python3 install.py --with-browser --with-captcha     # Windows: python install.py ...
 ./feedxcavator.sh                                    # .\feedxcavator.cmd on Windows
 ```
+
+To update, run `git pull` in the clone, then `python3 install.py` without options (see below).
 
 `install.py` creates `.venv` with the dependency versions pinned in `uv.lock`, downloads the browser, creates
 `config.yml` from `config.example.yml` when there is none (edit `hostname` and `user` there), and offers to set
@@ -94,7 +98,7 @@ images directly when `x-accel` is set in `config.yml`. Set `secure-hostname` to 
 
 ### Running as a systemd user service
 
-Copy the installation to `~/feedxcavator` and install the bundled unit:
+The unit expects the installation in `~/feedxcavator` (clone into your home directory). Install it:
 
 ```sh
 mkdir -p ~/.config/systemd/user
