@@ -45,7 +45,7 @@
   <p class="hero__tag"><span class="dot"></span>experimental &middot; open source &middot; GPL v3</p>
   <h1 class="hero__title">Dig the feed<br>out of <em>anything.</em></h1>
   <div class="hero__row">
-    <p class="hero__lede">Feedxcavator reads RSS feeds and ordinary web pages, lets you reshape what it finds
+    <p class="hero__lede">Feedxcavator reads ordinary web pages and RSS feeds, lets you reshape what it finds
       with a few lines of your own code, and serves the result as a fresh feed for your reader.</p>
     <div class="hero__actions">
       <a class="btn btn--lg" href="https://gchristensen.github.io/feedxcavator/demo/console.html">Try the live demo</a>
@@ -122,7 +122,7 @@
     <article class="card">
       <span class="card__step">in</span>
       <h3>Take almost anything</h3>
-      <p>An existing RSS feed, or the plain HTML of a site that never offered one. Point at the headlines and it slices the page into items.</p>
+      <p>An existing RSS feed, or the plain HTML of a site that never offered one, or even a JSON API. Point at the headlines and it slices the page into items.</p>
     </article>
     <article class="card">
       <span class="card__step">through</span>
@@ -269,15 +269,15 @@
       <dl class="defs">
         <div>
           <dt>A real browser</dt>
-          <dd>Pages that draw themselves with JavaScript, load more on scrolling or sit behind a sign-in open in a real browser that Feedxcavator drives: wait for the posts, scroll, click, then read them with the same selectors. Browser profiles keep your logins between runs.</dd>
+          <dd>Pages that draw themselves with JavaScript, load more on scrolling or sit behind a sign-in could open in a real browser that Feedxcavator drives: wait for the posts, scroll, click, then read them with the same selectors. Browser profiles keep your logins between runs.</dd>
         </div>
         <div>
-          <dt>External scripts</dt>
-          <dd>Feedxcavator can expose small web endpoints. A script in any language, running anywhere, can pick up a feed, do the awkward part, and post the finished result back.</dd>
+          <dt>Handlers</dt>
+          <dd>A few lines in the workspace could add your own web endpoint under <code>/handler/</code>. It receives the query or form parameters as arguments and answers with text, HTML, JSON or a redirect: a webhook, a bookmarklet target, or a way to hand a stored feed to an outside program and take the processed result back, guarded by the API token.</dd>
         </div>
         <div>
           <dt>Background tasks</dt>
-          <dd>Slow extractions run on a schedule instead of on demand. The finished feed is stored and served instantly whenever a reader asks.</dd>
+          <dd>Slow extractions could be run on a schedule instead of on demand. The finished feed is stored and served instantly whenever a reader asks.</dd>
         </div>
       </dl>
     </div>

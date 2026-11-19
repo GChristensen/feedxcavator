@@ -13,7 +13,9 @@ is one pointer.
 from __future__ import annotations
 
 import logging
+import os
 import random
+import sys
 import threading
 import time
 from dataclasses import dataclass
@@ -120,7 +122,19 @@ def checkbox_point(box: dict) -> tuple[float, float]:
 # the pointer --------------------------------------------------------------------------------------
 
 
+def _xauthority_fallback(environ=os.environ):
+    """python-xlib, which pyautogui connects with, fails when XAUTHORITY is unset and ~/.Xauthority does not
+    exist, although a display without access control (the worker's Xvfb, a desktop opened with `xhost +`)
+    needs no cookie. An empty authority file makes it connect without one, as libX11 does."""
+    if not sys.platform.startswith("linux") or environ.get("XAUTHORITY"):
+        return
+    home = environ.get("HOME")
+    if not home or not os.path.exists(os.path.join(home, ".Xauthority")):
+        environ["XAUTHORITY"] = os.devnull
+
+
 def _gui():
+    _xauthority_fallback()
     try:
         import pyautogui
     except ImportError:

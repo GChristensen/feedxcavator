@@ -108,3 +108,17 @@ def test_an_expected_challenge_is_solved_even_before_it_shows(monkeypatch):
     _fast(monkeypatch)
     with pytest.raises(RuntimeError, match="headful"):
         captcha.solve(_FakePage([False]), headless=True, expected=True)
+
+
+def test_xauthority_fallback(tmp_path, monkeypatch):
+    monkeypatch.setattr(captcha.sys, "platform", "linux")
+    env = {"HOME": str(tmp_path)}
+    captcha._xauthority_fallback(env)
+    assert env["XAUTHORITY"] == captcha.os.devnull
+    (tmp_path / ".Xauthority").write_bytes(b"")
+    env = {"HOME": str(tmp_path)}
+    captcha._xauthority_fallback(env)
+    assert "XAUTHORITY" not in env
+    env = {"HOME": str(tmp_path / "none"), "XAUTHORITY": "/run/x/auth"}
+    captcha._xauthority_fallback(env)
+    assert env["XAUTHORITY"] == "/run/x/auth"
