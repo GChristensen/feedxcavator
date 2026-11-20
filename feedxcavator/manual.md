@@ -435,6 +435,41 @@ many seconds.
 A task can be started at any time with **Run now** on the Tasks or Schedules tab, and the tasks of a feed with
 **Run feed task** in its context menu. The **Runs** tab shows what ran, when, and with what result.
 
+### Starting a task over HTTP
+
+For a program outside the browser, such as cron, a script or a feed reader, a handler is the easier way in. It
+can require the API token instead of a login session (see [The API token](#the-api-token)):
+
+```python
+from feedxcavator.worker import enqueue_task
+
+@handler("run-task", auth=True)
+def run_task(name):
+    enqueue_task(name)
+    return text_page(f"{name} enqueued")
+```
+
+```hy
+(import feedxcavator.worker [enqueue-task])
+
+(defhandler ^:auth run-task [name]
+  (enqueue-task name)
+  (text-page f"{name} enqueued"))
+```
+
+`curl -H "x-feedxcavator-auth: <token>" "http://<host>:10000/handler/run-task?name=news"` then starts `news`.
+Leave out `auth` to allow the call without the token, for a client that cannot send headers. Then anyone
+who can reach the server can start the task, so keep such a handler fixed to one harmless task instead of taking
+the name as a parameter.
+
+A plain GET request to `/backend/run/<task>` also starts a task, as **Run now** does, and answers `<task> enqueued`.
+Nothing is checked when the task is queued, so a misspelled name still gets that answer; check the **Runs** tab.
+
+`/backend/run` belongs to the console, so it requires the console login, not the API token. A browser that is
+logged in can open it as a link or bookmark. It takes no CSRF token. The session cookie is `SameSite=Strict`,
+though, so a link on another site opens the login page instead. With `authentication: false` in `config.yml`
+anyone who can reach the server can start tasks this way.
+
 ### WebSub
 
 Feeds announce the built-in WebSub hub at `/websub` in their `hub` link. A feed reader that supports WebSub
