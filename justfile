@@ -7,10 +7,13 @@
 #   just demo-server                    start a server on demo/home for recording, in a new cmd window
 #   just record-demo [args]             record the demo fixtures from that server, then build the demo
 #   just lock                           update uv.lock and constraints.txt after a dependency change
-#   just deploy                         copy the code to the server
+#   just deploy                         copy the code to the server, then restart it over ssh (ctl restart)
+#   just restart                        only restart the server over ssh
 #   just pull-data                      replace local data/, workspace/ and config.yml with the server's
 #   just remote='\\host\share\dir' deploy   use another installation directory
 #
+# Restart: ssh with key authentication to FEEDXCAVATOR_SSH (default: the host of the remote path) and run
+# ./ctl restart in FEEDXCAVATOR_SSH_DIR (default ~/feedxcavator, the Linux path of the same installation).
 # FEEDXCAVATOR_REMOTE can also be set in a .env file next to this justfile (not committed).
 # Single-quote the value so the backslashes stay literal: FEEDXCAVATOR_REMOTE='\\host\share\dir'
 
@@ -21,6 +24,10 @@ set dotenv-load
 remote := env("FEEDXCAVATOR_REMOTE", '\\server\share\feedxcavator')
 
 # robocopy: 2-second timestamps for Samba, few retries, quiet; exit codes below 8 mean success
+# ssh target and installation directory on it, for restarting after a deploy
+ssh_host := env("FEEDXCAVATOR_SSH", "")
+ssh_dir := env("FEEDXCAVATOR_SSH_DIR", "~/feedxcavator")
+
 rc := "/FFT /XJ /R:2 /W:2 /NP /NDL /NJH"
 ok := "; if ($LASTEXITCODE -ge 8) { exit 1 } else { exit 0 }"
 
@@ -69,7 +76,12 @@ deploy:
     robocopy feedxcavator '{{remote}}\feedxcavator' /MIR /XD __pycache__ {{rc}}{{ok}}
     robocopy deploy '{{remote}}\deploy' /MIR {{rc}}{{ok}}
     robocopy . '{{remote}}' pyproject.toml uv.lock constraints.txt install.py README.md config.example.yml *.sh ctl feedxcavator.cmd {{rc}}{{ok}}
-    @echo 'Deployed. If dependencies changed, run python3 install.py there first. Then restart the server.'
+    @echo 'Deployed. If dependencies changed, run python3 install.py there first.'
+    just restart
+
+# Restart the server on the Linux host through ssh and ./ctl restart.
+restart:
+    $h = '{{ssh_host}}'; if (-not $h) { $h = ('{{remote}}' -split '\\' | Where-Object { $_ })[0] }; ssh $h 'cd {{ssh_dir}} && ./ctl restart'; if ($LASTEXITCODE) { exit 1 }
 
 # Update uv.lock from pyproject.toml and export the pinned versions for the pip path of install.py.
 lock:
