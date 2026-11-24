@@ -249,6 +249,18 @@ def produce_feed_output(feed, headlines) -> dict:
     }
 
 
+def placeholder_output(feed) -> dict:
+    """The output of a feed with tasks that has not been fetched yet: a single headline saying so, so that
+    the feed can be subscribed to before its first run. The guid is stable, so readers show it once."""
+    headline = {
+        "title": "No data yet",
+        "link": _source(feed) or get_feed_url(feed),
+        "guid": f"feedxcavator:no-data:{feed.get('key') or feed.get('suffix')}",
+        "summary": "This feed has not been fetched yet. Its headlines will appear after the first run of its task.",
+    }
+    return produce_feed_output(feed, [headline])
+
+
 def xml_format(xml: str | None) -> str | None:
     """Pretty-prints an XML document."""
     if not xml:

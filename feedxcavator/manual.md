@@ -49,7 +49,8 @@ entry to jump to it; right-click a task to run it or list its feeds.
 
 The toolbar above the editor follows the open file. For a `feed.yaml` it offers **Save**, **Test**, **Suggest
 selectors**, **Open** (the feed URL), **Subscribe** and **Delete**. For `scratch.hy` it offers **Run**. Ctrl S
-saves the file, or runs it in the case of the scratch file.
+saves the file, or runs it in the case of the scratch file. The button at the right end of the tab row closes all
+tabs, after asking when some have unsaved changes.
 
 **Test** extracts the feed without publishing it and shows the headlines in the output pane. A test skips the
 `history` filter steps, so it shows the same headlines every time and does not mark them as seen.
@@ -371,6 +372,10 @@ any change of suffix or directory, and it is also served at `/feed/uuid:<id>`. T
 A feed without `tasks` is extracted each time its URL is visited. A feed with `tasks` is extracted in the
 background: the result is stored and served when a user or a feed reader visits the URL, and pushed to WebSub
 subscribers. This suits feeds that need complex or slow processing.
+
+Until its first run stores something, a background feed serves a single "No data yet" headline, so a feed reader
+can subscribe to it without running the task first. The headline has a fixed guid and stays in the reader after
+the real headlines arrive.
 
 A background run replaces the stored output only when it produces headlines. When the extractor raises, the run
 is recorded as failed; when it returns no headlines, nothing is stored. Either way readers keep getting the previous

@@ -204,6 +204,15 @@ function close(file) {
   persist()
 }
 
+function closeAll() {
+  const unsaved = files.filter((f) => f.dirty).map((f) => f.path)
+  if (unsaved.length && !confirm(`Discard unsaved changes in these files?\n\n${unsaved.join('\n')}`)) return
+  files.splice(0)
+  active.value = null
+  outline.value = []
+  persist()
+}
+
 function renameOpen(oldPath, newPath) {
   for (const file of files) {
     if (file.path === oldPath || file.path.startsWith(oldPath + '/')) {
@@ -582,16 +591,25 @@ defineExpose({
       </div>
 
       <div class="main">
-        <div class="file-tabs">
-          <div
-            v-for="file in files" :key="file.path" class="file-tab"
-            :class="{ active: file.path === active, error: tree.errorPaths.has(file.path) }"
-            :title="file.path" @click="activate(file.path)" @mousedown.middle.prevent="close(file)"
-          >
-            <span class="name">{{ tabLabel(file) }}</span>
-            <span v-if="file.dirty" class="dirty" title="unsaved changes">●</span>
-            <button class="close" title="Close" @click.stop="close(file)">×</button>
+        <div class="file-tab-row">
+          <div class="file-tabs">
+            <div
+              v-for="file in files" :key="file.path" class="file-tab"
+              :class="{ active: file.path === active, error: tree.errorPaths.has(file.path) }"
+              :title="file.path" @click="activate(file.path)" @mousedown.middle.prevent="close(file)"
+            >
+              <span class="name">{{ tabLabel(file) }}</span>
+              <span v-if="file.dirty" class="dirty" title="unsaved changes">●</span>
+              <button class="close" title="Close" @click.stop="close(file)">×</button>
+            </div>
           </div>
+          <button v-if="files.length" class="close-all" title="Close all tabs" aria-label="Close all tabs" @click="closeAll">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"
+                 stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="1.5" y="4.5" width="10" height="10" rx="1.5" />
+              <path d="M4.5 1.5H13A1.5 1.5 0 0 1 14.5 3V11.5M4.5 7.5l4 4M8.5 7.5l-4 4" />
+            </svg>
+          </button>
         </div>
         <div class="toolbar">
           <!-- the toolbar adapts to the active file -->

@@ -22,7 +22,7 @@ from django.shortcuts import render
 from django.utils.http import http_date
 from django.views.decorators.csrf import csrf_exempt, ensure_csrf_cookie
 
-from feedxcavator import VERSION, conf, context, extraction, fetch, filters, reply, storage, websub, workspace
+from feedxcavator import VERSION, conf, context, extraction, fetch, filters, output, reply, storage, websub, workspace
 from feedxcavator.middleware import auth_enabled
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
@@ -248,8 +248,11 @@ def feed(request, suffix):
         return reply.page_not_found()
     if info.status != "ok" or info.feed is None:  # a feed that failed to load
         return _stored(info) or reply.service_unavailable(f"<h2>The feed failed to load</h2><pre>{info.error}</pre>")
-    if info.tasks:
-        return _stored(info) or reply.no_content()
+    if info.tasks:  # nothing stored yet: a placeholder headline, so the feed can be subscribed to
+        if stored := _stored(info):
+            return stored
+        placeholder = output.placeholder_output(info.feed)
+        return reply.web_page(placeholder["content_type"], placeholder["output"])
     with context.scope(source=extraction.extractor_name(info.feed)):
         result = extraction.run_feed(info.feed, "request", registry)
     if result.output is None:

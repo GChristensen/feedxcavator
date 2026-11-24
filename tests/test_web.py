@@ -68,7 +68,9 @@ def test_feed_routes(http, ws, client):
     assert client.get("/feed/off").status_code == 404  # a disabled feed
 
     requests_before = len(http.requests)
-    assert client.get("/feed/task").status_code == 204  # nothing stored yet
+    placeholder = client.get("/feed/task")  # nothing stored yet: a single placeholder headline
+    assert placeholder.status_code == 200 and placeholder["Content-Type"] == "application/rss+xml"
+    assert placeholder.content.count(b"<item>") == 1 and b"No data yet" in placeholder.content
     storage.store_feed_output(registry.feeds["task"].key, "<rss>stored</rss>", "application/rss+xml", 1)
     stored = client.get("/feed/task")
     assert stored.content == b"<rss>stored</rss>" and len(http.requests) == requests_before  # a feed with tasks is never extracted live

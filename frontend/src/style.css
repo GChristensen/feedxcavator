@@ -140,7 +140,11 @@ input.invalid { border-color: var(--error); }
 .outline .item img { width: 14px; height: 14px; }
 
 .main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-.file-tabs { display: flex; overflow-x: auto; background: var(--bg); border-bottom: 1px solid var(--border); flex: none; }
+.file-tab-row { display: flex; background: var(--bg); border-bottom: 1px solid var(--border); flex: none; }
+.file-tabs { display: flex; overflow-x: auto; flex: 1; min-width: 0; }
+.file-tab-row .close-all { display: flex; align-items: center; justify-content: center; width: 32px; flex: none;
+  border: none; border-radius: 0; padding: 0; background: none; color: var(--muted); }
+.file-tab-row .close-all:hover { background: var(--panel-2); color: #fff; }
 .file-tab { display: flex; align-items: center; gap: 6px; padding: 5px 8px 5px 12px; cursor: pointer; white-space: nowrap;
   border-right: 1px solid var(--border); color: var(--muted); user-select: none; }
 .file-tab.active { background: var(--panel); color: #fff; }
